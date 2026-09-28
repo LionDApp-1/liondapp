@@ -1,0 +1,2 @@
+const saved=localStorage.getItem("liondapp-language");const preferred=saved||(navigator.language.startsWith("zh")?"zh":"en");document.documentElement.dataset.language=preferred;document.querySelectorAll("[data-language-toggle]").forEach(button=>{button.textContent=preferred==="zh"?"English":"中文";button.addEventListener("click",()=>{const next=document.documentElement.dataset.language==="zh"?"en":"zh";document.documentElement.dataset.language=next;localStorage.setItem("liondapp-language",next);button.textContent=next==="zh"?"English":"中文"})});
+

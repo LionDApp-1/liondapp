@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>LionDApp Console</title>
+  <link rel="stylesheet" href="/assets/admin.css">
+  <script defer src="/assets/admin.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#overview" data-i18n-aria="brand.overview">
+      <span class="brand-mark">L</span>
+      <span><strong>LionDApp</strong><small data-i18n="brand.console">Operator Console</small></span>
+    </a>
+    <div class="top-actions">
+      <span class="environment" id="environment" data-i18n="status.connecting">Connecting</span>
+      <div class="language-switch" role="group" data-i18n-aria="language.label">
+        <button type="button" data-language="en">EN</button>
+        <button type="button" data-language="zh">中文</button>
+      </div>
+      <a class="secondary" href="https://admin.liondapp.1ion.top/login.html?setup=1">账号设置 / Account</a><button class="secondary" id="admin-logout">退出 / Sign out</button>
+      <button class="icon-button" id="refresh" data-i18n-title="action.refresh" data-i18n-aria="action.refresh">&#8635;</button>
+    </div>
+  </header>
+  <aside class="sidebar" data-i18n-aria="nav.label">
+    <nav>
+      <button class="active" data-view="overview"><span data-i18n="nav.overview">Overview</span></button>
+      <button data-view="works"><span data-i18n="nav.works">Work review</span><span class="nav-count" id="pending-nav">0</span></button>
+      <button data-view="content"><span data-i18n="nav.content">Content</span></button>
+      <button data-view="reports"><span data-i18n="nav.reports">Reports</span><span class="nav-count alert" id="reports-nav">0</span></button>
+      <button data-view="people"><span data-i18n="nav.people">People</span></button>
+      <button data-view="promotions"><span data-i18n="nav.promotions">Promotions</span></button>
+      <button data-view="system"><span data-i18n="nav.system">System</span></button>
+    </nav>
+    <div class="sidebar-foot"><span class="status-dot"></span><span data-i18n="status.protected">Cloudflare protected</span></div>
+  </aside>
+  <main>
+    <div id="status" class="toast" role="status" aria-live="polite"></div>
+    <div id="auth-required" class="auth-banner hidden" role="alert">
+      <div><strong data-i18n="auth.title">Administrator sign-in required</strong><span data-i18n="auth.message">Your administrator session is missing or expired.</span></div>
+      <a class="primary-link" href="https://admin.liondapp.1ion.top" data-i18n="auth.action">Sign in again</a>
+    </div>
+    <section id="overview" class="view">
+      <div class="page-head"><div><p class="eyebrow" data-i18n="section.operations">OPERATIONS</p><h1 data-i18n="nav.overview">Overview</h1></div><time id="overview-time"></time></div>
+      <div id="metric-grid" class="metric-grid" data-i18n-aria="overview.metrics"></div>
+      <div class="split-section">
+        <section class="panel"><div class="panel-head"><h2 data-i18n="overview.attention">Needs attention</h2><button class="link-button" data-open-view="works" data-i18n="action.openQueue">Open queue</button></div><div id="attention-list" class="compact-list"></div></section>
+        <section class="panel"><div class="panel-head"><h2 data-i18n="overview.platform">Platform status</h2></div><dl id="platform-status" class="definition-list"></dl></section>
+      </div>
+    </section>
+    <section id="works" class="view hidden">
+      <div class="page-head"><div><p class="eyebrow" data-i18n="section.moderation">MODERATION</p><h1 data-i18n="nav.works">Work review</h1></div><span id="work-count" class="count-label"></span></div>
+      <div class="toolbar">
+        <input id="work-search" type="search" data-i18n-placeholder="works.search">
+        <select id="work-filter" data-i18n-aria="works.status"><option value="pending" data-i18n="status.pending">Pending</option><option value="all" data-i18n="status.all">All statuses</option><option value="published" data-i18n="status.published">Published</option><option value="rejected" data-i18n="status.rejected">Rejected</option></select>
+      </div>
+      <div id="work-list" class="record-list"></div>
+    </section>
+    <section id="content" class="view hidden">
+      <div class="page-head"><div><p class="eyebrow" data-i18n="section.community">COMMUNITY</p><h1 data-i18n="nav.content">Content</h1></div><span id="content-count" class="count-label"></span></div>
+      <div class="toolbar">
+        <div class="segmented" role="group" data-i18n-aria="content.type"><button class="active" data-content="needs" data-i18n="content.needs">Needs</button><button data-content="comments" data-i18n="content.comments">Comments</button><button data-content="works" data-i18n="content.works">Works</button></div>
+        <input id="content-search" type="search" data-i18n-placeholder="content.search">
+      </div>
+      <div id="content-list" class="record-list"></div>
+    </section>
+    <section id="reports" class="view hidden">
+      <div class="page-head"><div><p class="eyebrow" data-i18n="section.safety">SAFETY</p><h1 data-i18n="nav.reports">Reports</h1></div><span id="report-count" class="count-label"></span></div>
+      <div class="toolbar">
+        <input id="report-search" type="search" data-i18n-placeholder="reports.search">
+        <select id="report-filter" data-i18n-aria="reports.status"><option value="open" data-i18n="status.open">Open</option><option value="all" data-i18n="status.all">All statuses</option><option value="resolved" data-i18n="status.resolved">Resolved</option><option value="dismissed" data-i18n="status.dismissed">Dismissed</option></select>
+      </div>
+      <div id="report-list" class="record-list"></div>
+    </section>
+    <section id="people" class="view hidden">
+      <div class="page-head"><div><p class="eyebrow" data-i18n="section.identities">IDENTITIES</p><h1 data-i18n="nav.people">People</h1></div><span id="people-count" class="count-label"></span></div>
+      <div class="toolbar">
+        <input id="people-search" type="search" data-i18n-placeholder="people.search">
+        <select id="people-filter" data-i18n-aria="people.status"><option value="all" data-i18n="status.all">All statuses</option><option value="active" data-i18n="status.active">Active</option><option value="blocked" data-i18n="status.blocked">Blocked</option><option value="deleted" data-i18n="status.deleted">Deleted</option></select>
+      </div>
+      <div id="people-list" class="record-list"></div>
+    </section>
+    <section id="promotions" class="view hidden">
+      <div class="page-head"><div><p class="eyebrow" data-i18n="section.recommendations">RECOMMENDATIONS</p><h1 data-i18n="nav.promotions">Promotions</h1></div><span id="promotion-count" class="count-label"></span></div>
+      <div class="toolbar">
+        <input id="promotion-search" type="search" data-i18n-placeholder="promotions.search">
+        <select id="promotion-filter" data-i18n-aria="promotions.status"><option value="all" data-i18n="status.all">All statuses</option><option value="confirmed" data-i18n="status.confirmed">Confirmed</option><option value="quoted" data-i18n="status.quoted">Quoted</option><option value="failed" data-i18n="status.failed">Failed</option><option value="expired" data-i18n="status.expired">Expired</option></select>
+      </div>
+      <div id="promotion-list" class="record-list"></div>
+    </section>
+    <section id="system" class="view hidden">
+      <div class="page-head"><div><p class="eyebrow" data-i18n="section.control">CONTROL</p><h1 data-i18n="nav.system">System</h1></div></div>
+      <div class="settings-grid">
+        <section class="panel"><div class="panel-head"><h2 data-i18n="system.price">Recommendation price</h2></div><form id="price-form"><label><span data-i18n="system.wholeSkr">Whole SKR</span><input id="price" type="number" min="1" step="1" required></label><button class="primary" type="submit" data-i18n="action.updatePrice">Update price</button></form><div id="price-meta" class="meta-line"></div></section>
+        <section class="panel"><div class="panel-head"><h2 data-i18n="system.catalog">Store catalog</h2><div class="panel-actions"><button id="translation-toggle" class="secondary">自动翻译 / Auto translate</button><button id="translation-retry" class="secondary">重试失败 / Retry failed</button><button id="translate-catalog" class="secondary" data-i18n="action.translate">Generate next 3</button><button id="sync-catalog" class="secondary" data-i18n="action.sync">Sync now</button></div></div><dl id="catalog-status" class="definition-list"></dl></section>
+        <section class="panel"><div class="panel-head"><h2 data-i18n="system.tips">Project tips</h2><button id="check-tip-readiness" class="secondary" data-i18n="action.checkTips">Check connection</button></div><p data-i18n="system.tipScope">Checks Mainnet and the SKR Mint only. Does not enable tipping or transfer funds.</p><p id="tip-readiness" class="meta-line" role="status" aria-live="polite"></p></section>
+      </div>
+      <section class="panel wide"><div class="panel-head"><h2 data-i18n="system.announcement">Publish announcement</h2></div><form id="announcement-form" class="announcement-form"><label><span data-i18n="form.titleEn">English title</span><input name="titleEn" required maxlength="120"></label><label><span data-i18n="form.titleZh">Chinese title</span><input name="titleZh" required maxlength="120"></label><label><span data-i18n="form.bodyEn">English body</span><textarea name="bodyEn" required maxlength="3000"></textarea></label><label><span data-i18n="form.bodyZh">Chinese body</span><textarea name="bodyZh" required maxlength="3000"></textarea></label><label class="check-row"><input name="pinned" type="checkbox"><span data-i18n="form.pin">Pin announcement</span></label><button class="primary" type="submit" data-i18n="action.publish">Publish</button></form><div id="announcement-list" class="compact-list separated"></div></section>
+      <section class="panel wide"><div class="panel-head"><h2 data-i18n="system.moderationEvents">Moderation events</h2><span id="moderation-count" class="count-label"></span></div><div id="moderation-list" class="data-table"></div></section>
+      <section class="panel wide"><div class="panel-head"><h2 data-i18n="system.audit">Audit log</h2><span id="audit-count" class="count-label"></span></div><div id="audit-list" class="data-table"></div></section>
+    </section>
+  </main>
+  <dialog id="detail-dialog"><div class="dialog-head"><div><p class="eyebrow" id="detail-eyebrow"></p><h2 id="detail-title"></h2></div><button class="icon-button" data-close-dialog data-i18n-aria="action.close">&#215;</button></div><div id="detail-body" class="dialog-body"></div><div id="detail-actions" class="dialog-actions"></div></dialog>
+  <dialog id="confirm-dialog"><div class="dialog-head"><h2 id="confirm-title" data-i18n="confirm.title">Confirm action</h2><button class="icon-button" data-cancel-confirm data-i18n-aria="action.close">&#215;</button></div><p id="confirm-message"></p><label id="confirm-note-wrap" class="hidden"><span data-i18n="confirm.note">Review note</span><textarea id="confirm-note" maxlength="1000"></textarea></label><div class="dialog-actions"><button data-cancel-confirm data-i18n="action.cancel">Cancel</button><button id="confirm-action" class="danger" data-i18n="action.confirm">Confirm</button></div></dialog>
+</body>
+</html>

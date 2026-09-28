@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">LionDApp</string>
+    <string name="needs">需求</string>
+    <string name="works">作品</string>
+    <string name="profile">我的</string>
+    <string name="search_hint">搜索需求与商店 1,000+ 款 dApp</string>
+    <string name="latest">最新</string>
+    <string name="most_needed">最多需要</string>
+    <string name="most_discussed">最多讨论</string>
+    <string name="most_liked">最多点赞</string>
+    <string name="promoted">推广</string>
+    <string name="i_need_this">我也需要</string>
+    <string name="comments">评论</string>
+    <string name="connect_wallet">使用 Seed Vault 登录</string>
+    <string name="browse_first">可自由浏览，参与互动需要经过验证的 .skr 身份。</string>
+    <string name="publish_need">发布需求</string>
+    <string name="publish_work">提交作品</string>
+    <string name="empty_needs">这里暂时没有需求</string>
+    <string name="empty_works">这里暂时没有已发布作品</string>
+    <string name="retry">重试</string>
+    <string name="delete">删除</string>
+    <string name="notifications">通知</string>
+    <string name="support">支持</string>
+</resources>

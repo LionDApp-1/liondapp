@@ -1,0 +1,24 @@
+<resources>
+    <string name="app_name">LionDApp</string>
+    <string name="needs">Needs</string>
+    <string name="works">Works</string>
+    <string name="profile">Me</string>
+    <string name="search_hint">Search needs &amp; 1,000+ Store dApps</string>
+    <string name="latest">Latest</string>
+    <string name="most_needed">Most needed</string>
+    <string name="most_discussed">Most discussed</string>
+    <string name="most_liked">Most liked</string>
+    <string name="promoted">Promoted</string>
+    <string name="i_need_this">I need this</string>
+    <string name="comments">Comments</string>
+    <string name="connect_wallet">Sign in with Seed Vault</string>
+    <string name="browse_first">Browse freely. A verified .skr identity is required to participate.</string>
+    <string name="publish_need">Publish a need</string>
+    <string name="publish_work">Submit a work</string>
+    <string name="empty_needs">No needs here yet</string>
+    <string name="empty_works">No published works here yet</string>
+    <string name="retry">Retry</string>
+    <string name="delete">Delete</string>
+    <string name="notifications">Notifications</string>
+    <string name="support">Support</string>
+</resources>
