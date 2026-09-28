@@ -35,7 +35,7 @@ export async function chatRoute(path: string, request: Request, env: Env, servic
     const admin = await requireAdmin(request, env);
     if (path === "/admin/message-reports" && request.method === "GET") {
       const rows = await env.DB.prepare(`SELECT r.*,m.sender_skr,m.body,m.deleted_at FROM message_reports r
-        JOIN messages m ON m.id=r.message_id ORDER BY r.status='open' DESC,r.created_at DESC LIMIT 100`).all();
+        JOIN messages m ON m.id=r.message_id ORDER BY r.status='open' DESC,CASE WHEN r.status='open' THEN r.created_at END ASC,r.created_at DESC LIMIT 100`).all();
       return json({ items: rows.results });
     }
     const reportId = path.match(/^\/admin\/message-reports\/([^/]+)$/)?.[1];

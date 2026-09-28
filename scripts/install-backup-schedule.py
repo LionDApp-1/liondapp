@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 repo = Path(__file__).resolve().parents[1]
-root = Path.home() / "Documents/liondapp-private-backups/automated"
+root = Path.home() / "Documents/LionDApp-private-backups/automated"
 agent = Path.home() / "Library/LaunchAgents/top.oneion.liondapp.backup.plist"
 node = shutil.which("node")
 if not node:

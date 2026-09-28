@@ -72,7 +72,7 @@ The Mainnet transaction-preparation and confirmation endpoints are intentionally
 
 ## Administration
 
-Protected `/admin/*` routes require a valid owner password session or Cloudflare Access JWT for `the configured operator identity`. `/admin/auth/status` is public; login is throttled. Setup/recovery requires Access even when a password session exists. Password-session mutations require an allowed Origin and `x-liondapp-admin: 1`.
+Protected `/admin/*` routes require a valid owner password session or Cloudflare Access JWT for `plus1ionczp@gmail.com`. `/admin/auth/status` is public; login is throttled. Setup/recovery requires Access even when a password session exists. Password-session mutations require an allowed Origin and `x-liondapp-admin: 1`.
 
 - `GET /admin/overview`
 - `GET /admin/config`

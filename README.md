@@ -29,11 +29,3 @@ See `docs/architecture.md`, `docs/security.md`, and `docs/release-checklist.md` 
 For the current delivery state, owner actions, cost controls, and Store package,
 see `docs/project-status.md`, `docs/cost-control.md`, and
 `docs/store-submission.md`.
-
-## Clock In submission package
-
-- `submission/LionDApp_ClockIn_2026_Deck_EN.pptx` — editable English deck.
-- `submission/LionDApp-release.apk` — signed Seeker APK for review.
-- `docs/hackathon-submission-draft-en.md` — factual submission copy and three-minute demo outline.
-
-The current build uses Devnet identity/payment gates. Mainnet payments and project tips are disabled in the submitted baseline. Solana dApp Store upload, Release NFT minting and review are separate portal steps and are not represented as complete by this repository.

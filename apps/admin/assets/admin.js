@@ -1,22 +1,87 @@
 const API = "/api";
 const ADMIN_URL = "https://admin.liondapp.1ion.top";
-const SUPPORTED_VIEWS = ["overview", "works", "content", "reports", "people", "promotions", "system"];
+const SUPPORTED_VIEWS = ["overview", "projects", "works", "content", "reports", "people", "promotions", "system"];
 const store = {
   view: "overview",
   contentType: "needs",
-  language: localStorage.getItem("liondapp-admin-language") === "zh" ? "zh" : "en",
+  language: (localStorage.getItem("liondapp-admin-language") || (navigator.language.startsWith("zh") ? "zh" : "en")) === "zh" ? "zh" : "en",
   works: [], needs: [], comments: [], reports: [], users: [], promotions: [],
   announcements: [], moderation: [], audit: [],
 };
 
 const I18N = {
   en: {
+    "ops.policyHidden": "Hidden · policy rule", "ops.period": "Created", "ops.allDates": "All dates", "ops.utcToday": "Today · UTC", "ops.goReview": "Open work review", "ops.discard": "Discard unsaved follow-up changes?",
+    "nav.projects": "Project workbench",
+    "ops.total": "All projects",
+    "ops.backlog": "Open follow-ups",
+    "ops.overdue": "Overdue",
+    "ops.today": "New today",
+    "ops.allProjects": "All projects ↗",
+    "ops.openWorkbench": "Open workbench ↗",
+    "ops.activity": "COMMUNITY MOMENTUM",
+    "ops.trend": "New projects · last 7 days",
+    "ops.owners": "Owner workload · top 6",
+    "ops.scope": "Projects = undeleted community needs + works. Store catalog entries are counted separately.",
+    "ops.stageMeaning": "Internal follow-up stages; not development or delivery certification.",
+    "ops.searchLabel": "Search",
+    "ops.search": "Project, submitter or operator…",
+    "ops.stage": "Follow-up stage",
+    "ops.active": "Open follow-ups",
+    "ops.new": "New intake",
+    "ops.inProgress": "In progress",
+    "ops.waiting": "Awaiting response",
+    "ops.done": "Closed",
+    "ops.closed": "Closed",
+    "ops.type": "Project type",
+    "ops.owner": "Operator",
+    "ops.everyone": "All owners",
+    "ops.unassigned": "Unassigned",
+    "ops.mine": "Assigned to me",
+    "ops.overdueOnly": "Overdue only",
+    "ops.filter": "Apply filters",
+    "ops.previous": "Previous",
+    "ops.next": "Next",
+    "ops.followUp": "INTERNAL FOLLOW-UP",
+    "ops.ownerHint": "Name or internal label",
+    "ops.claim": "Assign to me",
+    "ops.deadline": "Deadline · local time",
+    "ops.deadlineShort": "Deadline",
+    "ops.note": "Next action / internal note",
+    "ops.ownerNote": "Names are internal labels. Assignment does not grant login access or send notifications.",
+    "ops.reviewRequired": "This work is pending review. Approve or reject it in Work review before closing.",
+    "ops.save": "Save follow-up",
+    "ops.saved": "Follow-up saved",
+    "ops.project": "Project / submitter",
+    "ops.wait": "Time in stage",
+    "ops.inStage": "in current stage",
+    "ops.paid": "Paid development",
+    "ops.needFollowUp": "Community need",
+    "ops.noDeadline": "Not scheduled",
+    "ops.manage": "Manage",
+    "ops.deadlineMeaning": "Past a manually set deadline",
+    "ops.utcDay": "Since 00:00 UTC",
+    "ops.empty": "No matching projects",
+    "ops.emptyHint": "Change the filters or check again after a new submission.",
+    "ops.overdueAction": "Clear overdue follow-ups",
+    "ops.overdueHint": "Review deadlines and record the next action",
+    "ops.assignAction": "Assign unowned projects",
+    "ops.assignHint": "Give every open project an operator",
+    "ops.reportAction": "Review community reports",
+    "ops.oldest": "Oldest wait",
+    "ops.noReports": "Includes reports on private messages",
+    "ops.newRecords": "new projects",
+    "ops.registered": "Active accounts",
+    "ops.refreshFailed": "Refresh failed. Previously loaded data may be out of date.",
+    "ops.submittedBy": "Submitted by",
+    "ops.reactions": "reactions",
+    "ops.budget": "Self-reported budget",
     "system.tips": "Project tips", "action.checkTips": "Check connection",
     "system.tipScope": "Checks Mainnet and the SKR Mint only. Does not enable tipping or transfer funds.",
     "system.tipReady": "Mainnet connection and SKR Mint verified. Tip switch: {state}. Wallet acceptance and regional eligibility still require separate verification.",
     "system.tipOn": "on", "system.tipOff": "off",
     "brand.overview": "LionDApp overview", "brand.console": "Operator Console", "language.label": "Console language",
-    "nav.label": "Console navigation", "nav.overview": "Overview", "nav.works": "Work review", "nav.content": "Content",
+    "nav.label": "Console navigation", "nav.overview": "Executive overview", "nav.works": "Work review", "nav.content": "Content",
     "nav.reports": "Reports", "nav.people": "People", "nav.promotions": "Promotions", "nav.system": "System",
     "status.connecting": "Connecting", "status.protected": "Administrator session protected", "status.pending": "Pending",
     "status.all": "All statuses", "status.published": "Published", "status.rejected": "Rejected", "status.open": "Open",
@@ -28,6 +93,7 @@ const I18N = {
     "auth.title": "Administrator sign-in required", "auth.message": "Sign in with your LionDApp administrator account.",
     "auth.action": "Sign in again", "auth.error": "Administrator session expired. Sign in again.",
     "overview.metrics": "Platform metrics", "overview.attention": "Needs attention", "overview.platform": "Platform status",
+    "overview.subtitle": "Your command center for product, community and trust operations.", "overview.live": "Refreshes every minute", "overview.greeting": "GOOD AFTERNOON, OPERATOR", "overview.heroTitle": "A clear view. A focused next move.", "overview.heroBody": "Prioritize new work, unblock reviews and keep community health visible.", "overview.flowKicker": "PROJECT FLOW", "overview.flowTitle": "All projects by stage", "overview.flowCaption": "Current workload", "overview.todoKicker": "TODAY'S WORK", "overview.todoTitle": "Priority to-dos", "overview.projectsKicker": "PROJECT CONTROL", "overview.projectsTitle": "Projects to follow up", "overview.platformKicker": "PLATFORM HEALTH", "overview.owner": "Owner", "overview.unassigned": "Operator queue", "overview.waiting": "Waiting {time}", "overview.new": "New", "overview.stageNeeds": "Needs", "overview.stagePending": "Pending review", "overview.stagePublished": "Published", "overview.stageReports": "Reports", "overview.stagePeople": "Identities", "overview.todoReview": "Review submission", "overview.todoReport": "Resolve report", "overview.todoAge": "Waiting {time}", "overview.noTodo": "No urgent work. You are clear.", "overview.noProjects": "No new projects are waiting.", "overview.projectNeeds": "Need", "overview.projectWork": "Work", "overview.projectOwner": "Owner: {owner}",
     "overview.updated": "Updated {time}", "overview.environment": "Environment", "overview.payments": "Payments",
     "overview.api": "API", "overview.healthy": "Healthy", "overview.adminAccess": "Admin access",
     "overview.protected": "Protected", "overview.work": "Work", "overview.report": "Report",
@@ -69,12 +135,77 @@ const I18N = {
     "table.actor": "Actor", "table.action": "Action", "table.target": "Target", "error.request": "Request failed. Try again.",
   },
   zh: {
+    "ops.policyHidden": "已屏蔽 · 规则命中", "ops.period": "新增时间", "ops.allDates": "全部时间", "ops.utcToday": "今日 · UTC", "ops.goReview": "打开作品审核", "ops.discard": "放弃尚未保存的跟进修改吗？",
+    "nav.projects": "项目工作台",
+    "ops.total": "项目总量",
+    "ops.backlog": "未完成跟进",
+    "ops.overdue": "已逾期",
+    "ops.today": "今日新增",
+    "ops.allProjects": "查看全部 ↗",
+    "ops.openWorkbench": "打开工作台 ↗",
+    "ops.activity": "社区动态",
+    "ops.trend": "近 7 天项目新增",
+    "ops.owners": "负责人待办 · 前 6 位",
+    "ops.scope": "项目 = 未删除的社区需求 + 开发者作品，官方商店目录独立统计。",
+    "ops.stageMeaning": "阶段仅代表平台运营跟进，不代表开发进度或交付认证。",
+    "ops.searchLabel": "搜索",
+    "ops.search": "搜索项目、提交人或负责人…",
+    "ops.stage": "跟进阶段",
+    "ops.active": "未完成跟进",
+    "ops.new": "待受理",
+    "ops.inProgress": "跟进中",
+    "ops.waiting": "等待反馈",
+    "ops.done": "已结案",
+    "ops.closed": "已结案",
+    "ops.type": "项目类型",
+    "ops.owner": "运营负责人",
+    "ops.everyone": "全部负责人",
+    "ops.unassigned": "未分配",
+    "ops.mine": "分配给我",
+    "ops.overdueOnly": "只看逾期",
+    "ops.filter": "筛选",
+    "ops.previous": "上一页",
+    "ops.next": "下一页",
+    "ops.followUp": "运营跟进",
+    "ops.ownerHint": "填写姓名或内部称呼",
+    "ops.claim": "我来负责",
+    "ops.deadline": "处理截止时间 · 本地时区",
+    "ops.deadlineShort": "截止时间",
+    "ops.note": "下一步行动 / 内部备注",
+    "ops.ownerNote": "负责人是内部登记姓名，不授予后台权限，也不会自动向对方发送通知。",
+    "ops.reviewRequired": "该作品尚待审核，请在作品审核中通过或拒绝后结案，不能跳过审核。",
+    "ops.save": "保存跟进",
+    "ops.saved": "跟进信息已保存",
+    "ops.project": "项目 / 提交人",
+    "ops.wait": "当前阶段已停留",
+    "ops.inStage": "自进入当前阶段起",
+    "ops.paid": "付费开发",
+    "ops.needFollowUp": "社区需求",
+    "ops.noDeadline": "未设定",
+    "ops.manage": "管理",
+    "ops.deadlineMeaning": "超过手动设置的截止时间",
+    "ops.utcDay": "从 UTC 零点起统计",
+    "ops.empty": "暂无符合条件的项目",
+    "ops.emptyHint": "可调整筛选条件，或在收到新提交后刷新。",
+    "ops.overdueAction": "优先清理逾期事项",
+    "ops.overdueHint": "检查截止时间，记录下一步行动",
+    "ops.assignAction": "分配未认领的项目",
+    "ops.assignHint": "给每一项未完成跟进指定负责人",
+    "ops.reportAction": "处理社区举报",
+    "ops.oldest": "最久等待",
+    "ops.noReports": "包含私信举报",
+    "ops.newRecords": "个新增项目",
+    "ops.registered": "正常状态账户",
+    "ops.refreshFailed": "刷新失败，已显示的数据可能过期，请重试。",
+    "ops.submittedBy": "提交人：",
+    "ops.reactions": "次互动",
+    "ops.budget": "意向预算",
     "system.tips": "项目打赏", "action.checkTips": "检查连接",
     "system.tipScope": "仅检查主网连接和 SKR Mint，不开启打赏，不产生转账。",
     "system.tipReady": "主网连接及 SKR Mint 校验通过。打赏开关：{state}。实机付款与地区适用性仍需单独核实。",
     "system.tipOn": "已开启", "system.tipOff": "已关闭",
     "brand.overview": "LionDApp 后台概览", "brand.console": "运营管理后台", "language.label": "后台语言",
-    "nav.label": "后台导航", "nav.overview": "概览", "nav.works": "作品审核", "nav.content": "内容管理",
+    "nav.label": "后台导航", "nav.overview": "老板驾驶舱", "nav.works": "作品审核", "nav.content": "内容管理",
     "nav.reports": "举报处理", "nav.people": "用户管理", "nav.promotions": "推荐记录", "nav.system": "系统设置",
     "status.connecting": "正在连接", "status.protected": "管理员会话保护", "status.pending": "待审核",
     "status.all": "全部状态", "status.published": "已发布", "status.rejected": "已拒绝", "status.open": "待处理",
@@ -86,6 +217,7 @@ const I18N = {
     "auth.title": "需要管理员登录", "auth.message": "请使用你设置的 LionDApp 管理员账号登录。",
     "auth.action": "重新登录", "auth.error": "管理员登录已过期，请重新登录。",
     "overview.metrics": "平台指标", "overview.attention": "待处理事项", "overview.platform": "平台状态",
+    "overview.subtitle": "产品、社区与安全运营的总控中心。", "overview.live": "每分钟刷新", "overview.greeting": "下午好，运营负责人", "overview.heroTitle": "全局一眼掌握，下一步清晰可见。", "overview.heroBody": "优先处理新项目、清空审核队列，持续关注社区健康。", "overview.flowKicker": "项目流转", "overview.flowTitle": "项目运营阶段", "overview.flowCaption": "当前工作量", "overview.todoKicker": "今日待办", "overview.todoTitle": "优先处理事项", "overview.projectsKicker": "项目管控", "overview.projectsTitle": "优先跟进的项目", "overview.platformKicker": "平台健康度", "overview.owner": "负责人", "overview.unassigned": "运营待分配", "overview.waiting": "已等待 {time}", "overview.new": "新项目", "overview.stageNeeds": "需求", "overview.stagePending": "待审核", "overview.stagePublished": "已发布", "overview.stageReports": "举报", "overview.stagePeople": "用户", "overview.todoReview": "审核作品提交", "overview.todoReport": "处理举报", "overview.todoAge": "已等待 {time}", "overview.noTodo": "暂无紧急待办，当前清空。", "overview.noProjects": "暂无等待处理的新项目。", "overview.projectNeeds": "需求", "overview.projectWork": "作品", "overview.projectOwner": "负责人：{owner}",
     "overview.updated": "更新时间：{time}", "overview.environment": "运行环境", "overview.payments": "支付模式",
     "overview.api": "接口服务", "overview.healthy": "正常", "overview.adminAccess": "后台访问",
     "overview.protected": "已保护", "overview.work": "作品", "overview.report": "举报",
@@ -173,6 +305,8 @@ function apiErrorMessage(code) {
   const known = {
     positive_integer_required: store.language === "zh" ? "请输入大于 0 的整数。" : "Enter a positive whole number.",
     invalid_review_decision: store.language === "zh" ? "审核结果无效。" : "The review decision is invalid.",
+    operations_conflict: store.language === "zh" ? "记录已被另一处更新。请关闭后重新打开，避免覆盖其他人的修改。" : "This record changed. Close and reopen it before saving.",
+    review_required: store.language === "zh" ? "请先完成作品审核，再结案。" : "Complete work review before closing.",
     not_found: store.language === "zh" ? "目标记录不存在或已被删除。" : "The record was not found or was removed.",
   };
   return known[code] ?? (code && !String(code).includes(" ") ? `${t("error.request")} (${code})` : code || t("error.request"));
@@ -195,7 +329,6 @@ async function request(path, options = {}) {
     error.code = code;
     throw error;
   }
-  byId("auth-required").classList.add("hidden");
   return body;
 }
 
@@ -241,44 +374,138 @@ function openView(view) {
 }
 
 async function loadView(view) {
-  if (view === "overview") return loadOverview();
-  if (view === "works") return loadWorks();
-  if (view === "content") return loadContent();
-  if (view === "reports") return loadReports();
-  if (view === "people") return loadPeople();
-  if (view === "promotions") return loadPromotions();
-  if (view === "system") return loadSystem();
+  const loaders={overview:loadOverview,projects:loadProjects,works:loadWorks,content:loadContent,reports:loadReports,people:loadPeople,promotions:loadPromotions,system:loadSystem};
+  const result=await loaders[view]();
+  byId('auth-required').classList.add('hidden');
+  return result;
 }
 
+const opsLabel = (key) => t(`ops.${key}`);
+const stageKey = {new:'new',in_progress:'inProgress',waiting:'waiting',done:'done'};
+const stageBadge = (stage) => `<span class="badge ops-${escapeHtml(stage)}">${escapeHtml(opsLabel(stageKey[stage] || 'new'))}</span>`;
+const num = (value) => Number(value || 0).toLocaleString(store.language === 'zh' ? 'zh-CN' : 'en');
+let overviewLoad = 0, projectLoad = 0, projectPage = 1;
+let activeProject = null, projectInitialForm = '';
+function projectFormSnapshot(){return JSON.stringify(['project-assignee','project-stage','project-note','project-due'].map(id=>byId(id).value));}
+function closeProject(){if(byId('project-save').disabled)return false;if(projectFormSnapshot()!==projectInitialForm&&!window.confirm(opsLabel('discard')))return false;byId('project-dialog').close();return true;}
+function relativeWait(value) {
+  const start = Date.parse(value);
+  if(!Number.isFinite(start)) return '—';
+  const minutes=Math.max(0,Math.floor((Date.now()-start)/60000));
+  if(minutes<60) return store.language==='zh'?`${minutes} 分钟`:`${minutes}m`;
+  const hours=Math.floor(minutes/60);
+  if(hours<24) return store.language==='zh'?`${hours} 小时`:`${hours}h`;
+  return store.language==='zh'?`${Math.floor(hours/24)} 天 ${hours%24} 小时`:`${Math.floor(hours/24)}d ${hours%24}h`;
+}
+function isOverdue(item) { return item.stage!=='done' && item.due_at && Date.parse(item.due_at)<Date.now(); }
+function waitMarkup(item) {
+  return item.stage==='done'?`<span class="muted">${opsLabel('closed')}</span>`:`<span class="wait-age" title="${escapeHtml(dateTime(item.stage_since))}">${escapeHtml(relativeWait(item.stage_since))}</span><small>${escapeHtml(opsLabel('inStage'))}</small>`;
+}
+function projectRows(items, compact=false) {
+  if(!items.length) return `<div class="empty-state"><span class="empty-icon">✓</span><strong>${opsLabel('empty')}</strong><p>${opsLabel('emptyHint')}</p></div>`;
+  return `<table class="projects-table"><thead><tr><th>${opsLabel('project')}</th><th>${opsLabel('stage')}</th><th>${opsLabel('owner')}</th><th>${opsLabel('wait')}</th>${compact?'':`<th>${opsLabel('deadlineShort')}</th>`}<th><span class="sr-only">${t('action.open')}</span></th></tr></thead><tbody>${items.map(item=>`<tr class="${isOverdue(item)?'overdue-row':''}"><td><button class="project-name" data-project-type="${item.target_type}" data-project-id="${escapeHtml(item.id)}">${escapeHtml(item.title)}</button><small>${escapeHtml(item.author_skr)} · ${t(item.target_type==='need'?'content.needs':'content.works')}${item.request_type==='paid_development'?` · <span class="paid-label">${opsLabel('paid')}</span>`:''}</small></td><td>${stageBadge(item.stage)}<small>${item.policy_violation?opsLabel('policyHidden'):item.target_type==='work'?escapeHtml(statusLabel(item.public_status)):opsLabel('needFollowUp')}</small></td><td><span class="owner-chip ${item.assignee?'':'unassigned'}"><i>${item.assignee?escapeHtml(item.assignee.slice(0,1).toUpperCase()):'–'}</i>${escapeHtml(item.assignee||opsLabel('unassigned'))}</span></td><td>${waitMarkup(item)}${compact&&isOverdue(item)?`<small class="overdue-text">${opsLabel('overdue')}</small>`:''}</td>${compact?'':`<td><span class="${isOverdue(item)?'overdue-text':''}">${item.due_at?escapeHtml(dateTime(item.due_at)):opsLabel('noDeadline')}</span>${isOverdue(item)?`<small class="overdue-text">${opsLabel('overdue')} ${escapeHtml(relativeWait(item.due_at))}</small>`:''}</td>`}<td><button class="row-open" data-project-type="${item.target_type}" data-project-id="${escapeHtml(item.id)}" aria-label="${escapeHtml(opsLabel('manage')+' '+item.title)}">↗</button></td></tr>`).join('')}</tbody></table>`;
+}
+function bindProjectButtons() {
+  document.querySelectorAll('[data-project-id]').forEach(button=>button.onclick=()=>withBusy(button,()=>run(()=>openProject(button.dataset.projectType,button.dataset.projectId))));
+}
+function openProjects(filters={}) {
+  byId('projects-stage').value=filters.stage||'active';
+  byId('projects-type').value=filters.type||'all';
+  byId('projects-period').value=filters.period||'all';
+  byId('projects-owner').value=filters.owner||'all';
+  byId('projects-overdue').checked=!!filters.overdue;
+  byId('projects-search').value=''; projectPage=1;
+  openView('projects');
+}
 async function loadOverview() {
-  const [overview, works, reports] = await run(() => Promise.all([request("/admin/overview"), request("/admin/works"), request("/admin/reports")]));
-  store.overview = overview;
-  store.works = works.items;
-  store.reports = reports.items;
-  const metrics = overview.metrics;
-  const cards = [
-    ["metric.activeUsers", metrics.activeUsers, "accent"], ["metric.needs", metrics.needs, ""],
-    ["metric.publishedWorks", metrics.publishedWorks, ""], ["metric.pendingWorks", metrics.pendingWorks, metrics.pendingWorks ? "attention" : ""],
-    ["metric.openReports", metrics.openReports, metrics.openReports ? "attention" : ""], ["metric.comments", metrics.comments, ""],
-    ["metric.activePromotions", metrics.activePromotions, "accent"], ["metric.catalogApps", metrics.catalogApps, ""],
-    ["metric.blockedUsers", metrics.blockedUsers, ""], ["metric.moderation24h", metrics.moderation24h, metrics.moderation24h ? "attention" : ""],
-  ];
-  byId("metric-grid").innerHTML = cards.map(([key, value, tone]) => `<article class="metric ${tone}"><span>${escapeHtml(t(key))}</span><strong>${Number(value).toLocaleString()}</strong></article>`).join("");
-  byId("overview-time").textContent = t("overview.updated", { time: dateTime(overview.generatedAt) });
-  byId("environment").textContent = `${overview.environment} · ${overview.paymentMode}`;
-  byId("pending-nav").textContent = metrics.pendingWorks;
-  byId("reports-nav").textContent = metrics.openReports;
-  const attention = [
-    ...store.works.filter((item) => item.moderation_status === "pending").slice(0, 4).map((item) => ({ title: item.name, meta: `${t("overview.work")} · ${item.author_skr}`, view: "works" })),
-    ...store.reports.filter((item) => item.status === "open").slice(0, 4).map((item) => ({ title: item.reason, meta: `${t("overview.report")} · ${item.target_label || item.target_id}`, view: "reports" })),
-  ].slice(0, 6);
-  byId("attention-list").innerHTML = attention.length ? attention.map((item) => `<button class="compact-row link-button" data-open-view="${item.view}"><span><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.meta)}</span></span><span>${escapeHtml(t("action.open"))}</span></button>`).join("") : emptyMarkup();
-  byId("platform-status").innerHTML = `<div><dt>${t("overview.environment")}</dt><dd>${escapeHtml(overview.environment)}</dd></div><div><dt>${t("overview.payments")}</dt><dd>${escapeHtml(overview.paymentMode)}</dd></div><div><dt>${t("overview.api")}</dt><dd>${t("overview.healthy")}</dd></div><div><dt>${t("overview.adminAccess")}</dt><dd>${t("overview.protected")}</dd></div>`;
-  bindOpenView();
+  const seq=++overviewLoad;
+  byId('overview').classList.add('is-loading');
+  byId('overview').classList.remove('load-failed');
+  byId('overview').setAttribute('aria-busy','true');
+  try {
+    const [overview,ops]=await run(()=>Promise.all([request('/admin/overview'),request('/admin/operations/summary')]));
+    if(seq!==overviewLoad) return;
+    store.overview=overview;store.operations=ops;store.operator=ops.operator;
+    const m=overview.metrics, o=ops.totals;
+    byId('overview-time').textContent=t('overview.updated',{time:dateTime(ops.generatedAt)});
+    byId('environment').textContent=`${overview.environment} · ${overview.paymentMode}`;
+    byId('pending-nav').textContent=m.pendingWorks;byId('reports-nav').textContent=m.openReports;byId('projects-nav').textContent=o.backlog;
+    const cards=[
+      {title:opsLabel('total'),value:o.total,meta:`${num(o.needs)} ${t('content.needs')} / ${num(o.works)} ${t('content.works')}`,filter:{stage:'all'},tone:'accent'},
+      {title:opsLabel('backlog'),value:o.backlog,meta:`${opsLabel('unassigned')} ${num(o.unassigned)}`,filter:{stage:'active'}},
+      {title:opsLabel('overdue'),value:o.overdue,meta:opsLabel('deadlineMeaning'),filter:{overdue:true},tone:o.overdue?'attention':''},
+      {title:opsLabel('today'),value:o.new_today,meta:opsLabel('utcDay'),filter:{stage:'all',period:'today'}}
+    ];
+    byId('metric-grid').innerHTML=cards.map((c,i)=>`<button class="metric ${c.tone||''}" data-metric="${i}"><span>${escapeHtml(c.title)}</span><strong>${num(c.value)}</strong><small>${escapeHtml(c.meta)}</small><i aria-hidden="true">↗</i></button>`).join('');
+    document.querySelectorAll('[data-metric]').forEach(b=>b.onclick=()=>openProjects(cards[Number(b.dataset.metric)].filter));
+    byId('ops-summary').innerHTML=`<div><strong>${num(m.pendingWorks)}</strong><span>${t('metric.pendingWorks')}</span></div><div><strong>${num(ops.reports.total)}</strong><span>${t('metric.openReports')}</span></div>`;
+    const counts=Object.fromEntries(ops.stages.map(s=>[s.stage,Number(s.count)]));
+    byId('stage-board').innerHTML=['new','in_progress','waiting','done'].map((stage,index)=>`<button class="stage-card ops-${stage}" data-stage-filter="${stage}"><span class="stage-step">0${index+1}</span><strong>${num(counts[stage])}</strong><span>${opsLabel(stageKey[stage])}</span><progress value="${counts[stage]||0}" max="${Math.max(Number(o.total),1)}" aria-label="${opsLabel(stageKey[stage])}"></progress></button>`).join('')+`<p class="section-note stage-note">${opsLabel('stageMeaning')}</p>`;
+    document.querySelectorAll('[data-stage-filter]').forEach(b=>b.onclick=()=>openProjects({stage:b.dataset.stageFilter}));
+    const actions=[
+      {n:o.overdue,title:opsLabel('overdueAction'),hint:opsLabel('overdueHint'),tone:'red',filter:{overdue:true}},
+      {n:o.unassigned,title:opsLabel('assignAction'),hint:opsLabel('assignHint'),tone:'amber',filter:{owner:'unassigned'}},
+      {n:ops.reports.total,title:opsLabel('reportAction'),hint:ops.reports.oldest_since?`${opsLabel('oldest')} ${relativeWait(ops.reports.oldest_since)}`:opsLabel('noReports'),tone:'blue',view:'reports'}
+    ];
+    byId('attention-list').innerHTML=actions.map((a,i)=>`<button class="action-row" data-priority="${i}"><span class="action-symbol ${a.tone}">${a.tone==='red'?'!':a.tone==='amber'?'+':'◇'}</span><span><strong>${a.title}</strong><small>${escapeHtml(a.hint)}</small></span><b>${num(a.n)}</b><span aria-hidden="true">›</span></button>`).join('');
+    document.querySelectorAll('[data-priority]').forEach(b=>b.onclick=()=>{const a=actions[Number(b.dataset.priority)];if(a.view){byId('report-filter').value='open';openView(a.view);}else openProjects(a.filter);});
+    byId('project-count').textContent=`${ops.projects.length} / ${num(o.backlog)}`;
+    byId('project-board').innerHTML=projectRows(ops.projects,true);
+    const days=Array.from({length:7},(_,i)=>new Date(Date.parse(ops.generatedAt.slice(0,10))-(6-i)*86400000).toISOString().slice(0,10));
+    const data=days.map(day=>({day,need:Number(ops.trend.find(x=>x.day===day&&x.target_type==='need')?.count||0),work:Number(ops.trend.find(x=>x.day===day&&x.target_type==='work')?.count||0)}));
+    const max=Math.max(1,...data.map(d=>d.need+d.work));
+    byId('project-trend').innerHTML=`<div class="chart-legend"><span><i class="legend-need"></i>${t('content.needs')}</span><span><i class="legend-work"></i>${t('content.works')}</span><b>${num(data.reduce((a,d)=>a+d.need+d.work,0))} ${opsLabel('newRecords')}</b></div><svg class="activity-chart" role="img" aria-label="${escapeHtml(opsLabel('trend'))}" viewBox="0 0 630 170"><path d="M10 128H620 M10 66H620" stroke="#e9eee9" fill="none"/>${data.map((d,i)=>{const x=28+i*86;const n=d.need/max*96,w=d.work/max*96;return `<g><title>${d.day}: ${d.need} ${t('content.needs')}, ${d.work} ${t('content.works')}</title><rect x="${x}" y="${128-n}" width="36" height="${n}" rx="3" fill="#28644f"/><rect x="${x}" y="${128-n-w}" width="36" height="${w}" rx="3" fill="#acceb7"/><text x="${x+18}" y="${Math.max(18,118-n-w)}" text-anchor="middle">${d.need+d.work}</text><text x="${x+18}" y="157" text-anchor="middle" class="chart-day">${d.day.slice(5)}</text></g>`;}).join('')}</svg>`;
+    byId('owner-workload').innerHTML=ops.owners.length?ops.owners.map(owner=>`<div class="owner-row"><span class="owner-chip ${owner.assignee?'':'unassigned'}"><i>${owner.assignee?escapeHtml(owner.assignee.slice(0,1).toUpperCase()):'–'}</i>${escapeHtml(owner.assignee||opsLabel('unassigned'))}</span><b>${num(owner.count)}</b></div>`).join(''):`<div class="empty-state">${opsLabel('empty')}</div>`;
+    byId('platform-status').innerHTML=[
+      [opsLabel('registered'),num(m.activeUsers)],[t('metric.comments'),num(m.comments)],
+      [t('metric.catalogApps'),num(m.catalogApps)],[t('metric.openReports'),num(m.openReports)],
+      [t('metric.moderation24h'),num(m.moderation24h)],[t('overview.environment'),overview.environment],
+      [t('overview.payments'),overview.paymentMode]
+    ].map(([label,value])=>`<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('');
+    bindProjectButtons();bindOpenView();
+    byId("auth-required").classList.add("hidden");
+  } catch(error) { if(seq===overviewLoad){byId('overview').classList.add('load-failed');byId('overview-time').textContent=opsLabel('refreshFailed');} throw error; }
+  finally {if(seq===overviewLoad){byId('overview').classList.remove('is-loading');byId('overview').setAttribute('aria-busy','false');}}
+}
+async function loadProjects() {
+  const seq=++projectLoad;
+  const params=new URLSearchParams({page:String(projectPage),q:byId('projects-search').value,stage:byId('projects-stage').value,type:byId('projects-type').value,owner:byId('projects-owner').value,period:byId('projects-period').value,overdue:String(byId('projects-overdue').checked)});
+  byId('projects-table').setAttribute('aria-busy','true');byId('projects-error').classList.add('hidden');
+  try {
+    const data=await run(()=>request('/admin/operations/projects?'+params));
+    if(seq!==projectLoad) return;
+    store.operator=data.operator;
+    const pages=Math.max(1,Math.ceil(data.total/data.pageSize));
+    if(projectPage>pages){projectPage=pages;return loadProjects();}
+    byId('projects-total').textContent=t('count.records',{count:num(data.total)});
+    byId('projects-table').innerHTML=projectRows(data.items);
+    byId('projects-page').textContent=`${data.page} / ${pages}`;
+    byId('projects-prev').disabled=data.page<=1;byId('projects-next').disabled=data.page>=pages;
+    bindProjectButtons();
+  } catch(error){if(seq===projectLoad){byId('projects-error').textContent=opsLabel('refreshFailed');byId('projects-error').classList.remove('hidden');}throw error;}
+  finally{if(seq===projectLoad)byId('projects-table').setAttribute('aria-busy','false');}
+}
+async function openProject(type,id) {
+  const item=await request(`/admin/operations/projects/${type}/${encodeURIComponent(id)}`);
+  activeProject=item;
+  byId('project-title').textContent=item.title;
+  byId('project-meta').textContent=`${opsLabel('submittedBy')} ${item.author_skr} · ${dateTime(item.created_at)}`;
+  byId('project-summary').textContent=item.summary;
+  byId('project-facts').innerHTML=`${stageBadge(item.stage)}${item.policy_violation?`<span class="badge rejected">${opsLabel('policyHidden')}</span>`:''} <span>${opsLabel('wait')}: ${item.stage==='done'?'—':escapeHtml(relativeWait(item.stage_since))}</span> <span>${num(item.reactions)} ${opsLabel('reactions')} · ${num(item.comment_count)} ${t('metric.comments')}</span>${item.budget_skr?`<span>${opsLabel('budget')}: ${num(item.budget_skr)} SKR</span>`:''}`;
+  byId('project-assignee').value=item.assignee;byId('project-stage').value=item.stage;byId('project-note').value=item.note;
+  const pending=item.target_type==='work'&&item.public_status==='pending';
+  byId('project-stage').querySelector('[value="done"]').disabled=pending;
+  byId('project-review-hint').classList.toggle('hidden',!pending);
+  if(item.due_at){const d=new Date(item.due_at);byId('project-due').value=new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,16);}else byId('project-due').value='';
+  byId('project-save-error').textContent='';
+  byId('project-go-review').classList.toggle('hidden',item.target_type!=='work');
+  projectInitialForm=projectFormSnapshot();
+  byId('project-dialog').showModal();
 }
 
 async function loadWorks() {
-  const data = await run(() => request("/admin/works"));
+  const data = await run(() => request("/admin/works" + (store.focusWork ? "?id=" + encodeURIComponent(store.focusWork) : "")));
+  store.focusWork=null;
   store.works = data.items;
   renderWorks();
 }
@@ -490,7 +717,8 @@ function bindOpenView() {
 
 async function refreshCounts() {
   try {
-    const overview = await request("/admin/overview");
+    const [overview,ops] = await Promise.all([request("/admin/overview"),request("/admin/operations/summary")]);
+    byId("projects-nav").textContent = ops.totals.backlog;
     byId("pending-nav").textContent = overview.metrics.pendingWorks;
     byId("reports-nav").textContent = overview.metrics.openReports;
   } catch (_) {
@@ -579,3 +807,27 @@ byId("translation-retry").addEventListener("click", () => askConfirm({
   message:store.language === "zh" ? "重新排队并开启自动翻译？会使用 Workers AI 配额。" : "Requeue failed items and enable auto translation? This uses Workers AI quota.",
   action:async () => {await request("/admin/store-catalog/translation-control", {method:"POST",body:JSON.stringify({enabled:true,retryFailed:true})});await loadSystem();},
 }));
+
+byId('project-filters').addEventListener('submit',event=>{event.preventDefault();projectPage=1;void loadProjects().catch(()=>{});});
+byId('projects-prev').onclick=()=>{projectPage=Math.max(1,projectPage-1);void loadProjects().catch(()=>{});};
+byId('projects-next').onclick=()=>{projectPage++;void loadProjects().catch(()=>{});};
+document.querySelectorAll('[data-close-project]').forEach(button=>button.onclick=closeProject);
+byId('project-claim').onclick=()=>{byId('project-assignee').value=store.operator||'';};
+byId('project-form').addEventListener('submit',event=>{
+  event.preventDefault();
+  if(!activeProject) return;
+  void withBusy(byId('project-save'),async()=>{
+    byId('project-save-error').textContent='';
+    try {
+      await request(`/admin/operations/projects/${activeProject.target_type}/${encodeURIComponent(activeProject.id)}`,{method:'POST',body:JSON.stringify({
+        revision:activeProject.revision,stage:byId('project-stage').value,assignee:byId('project-assignee').value,
+        due_at:byId('project-due').value?new Date(byId('project-due').value).toISOString():null,note:byId('project-note').value
+      })});
+      byId('project-dialog').close();showStatus(opsLabel('saved'));await loadView(store.view);await refreshCounts();
+    }catch(error){byId('project-save-error').textContent=error.message;}
+  });
+});
+setInterval(()=>{if(store.view==='overview'&&!document.hidden&&!document.querySelector('dialog[open]'))void loadOverview().catch(()=>{});},60000);
+
+byId('project-dialog').addEventListener('cancel',event=>{event.preventDefault();closeProject();});
+byId('project-go-review').onclick=()=>{if(!closeProject())return;store.focusWork=activeProject.id;byId('work-search').value='';byId('work-filter').value='all';openView('works');};

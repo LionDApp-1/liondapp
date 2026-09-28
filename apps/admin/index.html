@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <title>LionDApp Console</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/assets/admin.css">
+  <link rel="stylesheet" href="/assets/cockpit.css">
   <script defer src="/assets/admin.js"></script>
 </head>
 <body>
@@ -27,9 +29,10 @@
   <aside class="sidebar" data-i18n-aria="nav.label">
     <nav>
       <button class="active" data-view="overview"><span data-i18n="nav.overview">Overview</span></button>
-      <button data-view="works"><span data-i18n="nav.works">Work review</span><span class="nav-count" id="pending-nav">0</span></button>
+      <button data-view="projects"><span data-i18n="nav.projects">Project workbench</span><span class="nav-count" id="projects-nav">—</span></button>
+      <button data-view="works"><span data-i18n="nav.works">Work review</span><span class="nav-count" id="pending-nav">—</span></button>
       <button data-view="content"><span data-i18n="nav.content">Content</span></button>
-      <button data-view="reports"><span data-i18n="nav.reports">Reports</span><span class="nav-count alert" id="reports-nav">0</span></button>
+      <button data-view="reports"><span data-i18n="nav.reports">Reports</span><span class="nav-count alert" id="reports-nav">—</span></button>
       <button data-view="people"><span data-i18n="nav.people">People</span></button>
       <button data-view="promotions"><span data-i18n="nav.promotions">Promotions</span></button>
       <button data-view="system"><span data-i18n="nav.system">System</span></button>
@@ -43,12 +46,32 @@
       <a class="primary-link" href="https://admin.liondapp.1ion.top" data-i18n="auth.action">Sign in again</a>
     </div>
     <section id="overview" class="view">
-      <div class="page-head"><div><p class="eyebrow" data-i18n="section.operations">OPERATIONS</p><h1 data-i18n="nav.overview">Overview</h1></div><time id="overview-time"></time></div>
+      <div class="page-head cockpit-head"><div><p class="eyebrow" data-i18n="section.operations">OPERATIONS</p><h1 data-i18n="nav.overview">Overview</h1><p class="page-subtitle" data-i18n="overview.subtitle">Your command center for product, community and trust operations.</p></div><div class="head-status"><span class="live-pulse"></span><span data-i18n="overview.live">Live cockpit</span><time id="overview-time"></time></div></div>
+      <section class="cockpit-hero"><div><span class="hero-kicker">LIONDAPP / CONTROL CENTER</span><h2 data-i18n="overview.heroTitle">Run the platform from one clear view.</h2><p data-i18n="overview.heroBody">Prioritize new work, unblock reviews and keep community health visible.</p></div><div id="ops-summary" class="ops-summary"></div></section>
       <div id="metric-grid" class="metric-grid" data-i18n-aria="overview.metrics"></div>
-      <div class="split-section">
-        <section class="panel"><div class="panel-head"><h2 data-i18n="overview.attention">Needs attention</h2><button class="link-button" data-open-view="works" data-i18n="action.openQueue">Open queue</button></div><div id="attention-list" class="compact-list"></div></section>
-        <section class="panel"><div class="panel-head"><h2 data-i18n="overview.platform">Platform status</h2></div><dl id="platform-status" class="definition-list"></dl></section>
+      <div class="cockpit-grid">
+        <section class="panel stage-panel"><div class="panel-head"><div><p class="panel-kicker" data-i18n="overview.flowKicker">PROJECT FLOW</p><h2 data-i18n="overview.flowTitle">All projects by stage</h2></div><button class="link-button" data-open-view="projects" data-i18n="ops.allProjects">All projects</button></div><div id="stage-board" class="stage-board"></div></section>
+        <section class="panel action-panel"><div class="panel-head"><div><p class="panel-kicker" data-i18n="overview.todoKicker">TODAY'S WORK</p><h2 data-i18n="overview.todoTitle">Priority to-dos</h2></div><button class="link-button" data-open-view="projects" data-i18n="ops.openWorkbench">Open workbench</button></div><div id="attention-list" class="todo-list"></div></section>
       </div>
+      <div class="cockpit-grid lower-grid">
+        <section class="panel"><div class="panel-head"><div><p class="panel-kicker" data-i18n="overview.projectsKicker">PROJECT CONTROL</p><h2 data-i18n="overview.projectsTitle">New projects waiting</h2></div><span id="project-count" class="panel-caption"></span></div><p class="section-note" data-i18n="ops.scope">Needs + works. Internal follow-up stages do not certify development or delivery.</p><div id="project-board" class="project-board"></div></section>
+        <section class="panel"><div class="panel-head"><div><p class="panel-kicker" data-i18n="overview.platformKicker">PLATFORM HEALTH</p><h2 data-i18n="overview.platform">Platform status</h2></div></div><dl id="platform-status" class="definition-list"></dl></section>
+      </div>
+      <div class="cockpit-grid trend-grid"><section class="panel"><div class="panel-head"><div><p class="panel-kicker" data-i18n="ops.activity">ACTIVITY</p><h2 data-i18n="ops.trend">New projects · last 7 days</h2></div><span class="panel-caption">UTC</span></div><div id="project-trend"></div></section><section class="panel"><div class="panel-head"><h2 data-i18n="ops.owners">Workload by owner</h2></div><div id="owner-workload"></div></section></div>
+    </section>
+    <section id="projects" class="view hidden">
+      <div class="page-head"><div><p class="eyebrow">PROJECT WORKSPACE</p><h1 data-i18n="nav.projects">Project workbench</h1><p class="page-subtitle" data-i18n="ops.scope">Internal follow-up only.</p></div><span id="projects-total" class="count-label"></span></div>
+      <form id="project-filters" class="project-filters">
+        <label class="search-field"><span data-i18n="ops.searchLabel">Search</span><input id="projects-search" type="search" maxlength="120" data-i18n-placeholder="ops.search"></label>
+        <label><span data-i18n="ops.stage">Stage</span><select id="projects-stage"><option value="active" data-i18n="ops.active">Open follow-ups</option><option value="all" data-i18n="status.all">All</option><option value="new" data-i18n="ops.new">New</option><option value="in_progress" data-i18n="ops.inProgress">In progress</option><option value="waiting" data-i18n="ops.waiting">Waiting</option><option value="done" data-i18n="ops.done">Closed</option></select></label>
+        <label><span data-i18n="ops.type">Type</span><select id="projects-type"><option value="all" data-i18n="status.all">All</option><option value="need" data-i18n="content.needs">Needs</option><option value="work" data-i18n="content.works">Works</option></select></label>
+        <label><span data-i18n="ops.period">Created</span><select id="projects-period"><option value="all" data-i18n="ops.allDates">All dates</option><option value="today" data-i18n="ops.utcToday">Today · UTC</option></select></label>
+        <label><span data-i18n="ops.owner">Operator</span><select id="projects-owner"><option value="all" data-i18n="ops.everyone">Everyone</option><option value="unassigned" data-i18n="ops.unassigned">Unassigned</option><option value="mine" data-i18n="ops.mine">Mine</option></select></label>
+        <label class="check-row"><input id="projects-overdue" type="checkbox"><span data-i18n="ops.overdueOnly">Overdue only</span></label><button class="primary" type="submit" data-i18n="ops.filter">Apply</button>
+      </form>
+      <div id="projects-error" class="view-error hidden" role="alert"></div>
+      <div id="projects-table" class="panel project-table-wrap"></div>
+      <div class="pagination"><button id="projects-prev" class="secondary" data-i18n="ops.previous">Previous</button><span id="projects-page"></span><button id="projects-next" class="secondary" data-i18n="ops.next">Next</button></div>
     </section>
     <section id="works" class="view hidden">
       <div class="page-head"><div><p class="eyebrow" data-i18n="section.moderation">MODERATION</p><h1 data-i18n="nav.works">Work review</h1></div><span id="work-count" class="count-label"></span></div>
@@ -102,6 +125,7 @@
       <section class="panel wide"><div class="panel-head"><h2 data-i18n="system.audit">Audit log</h2><span id="audit-count" class="count-label"></span></div><div id="audit-list" class="data-table"></div></section>
     </section>
   </main>
+  <dialog id="project-dialog"><form id="project-form"><div class="dialog-head"><div><p class="eyebrow" data-i18n="ops.followUp">INTERNAL FOLLOW-UP</p><h2 id="project-title"></h2></div><button type="button" class="icon-button" data-close-project data-i18n-aria="action.close">×</button></div><div class="dialog-body"><p id="project-meta" class="record-meta"></p><p id="project-summary"></p><div id="project-facts" class="project-facts"></div><div class="form-grid"><label><span data-i18n="ops.owner">Operator</span><input id="project-assignee" maxlength="80" autocomplete="off" data-i18n-placeholder="ops.ownerHint"></label><button type="button" id="project-claim" class="secondary" data-i18n="ops.claim">Assign to me</button><label><span data-i18n="ops.stage">Stage</span><select id="project-stage"><option value="new" data-i18n="ops.new">New</option><option value="in_progress" data-i18n="ops.inProgress">In progress</option><option value="waiting" data-i18n="ops.waiting">Waiting</option><option value="done" data-i18n="ops.done">Closed</option></select></label><label><span data-i18n="ops.deadline">Deadline · local time</span><input id="project-due" type="datetime-local"></label></div><label class="note-field"><span data-i18n="ops.note">Next action / internal note</span><textarea id="project-note" maxlength="2000"></textarea></label><p class="section-note" data-i18n="ops.ownerNote">Operator names are internal labels; assigning a name does not grant console access or notify anyone.</p><button type="button" id="project-go-review" class="secondary" data-i18n="ops.goReview">Open work review</button><p id="project-review-hint" class="section-note hidden" data-i18n="ops.reviewRequired">Pending works must be approved or rejected in Work review before this follow-up can close.</p><p id="project-save-error" role="alert"></p></div><div class="dialog-actions"><button type="button" data-close-project class="secondary" data-i18n="action.cancel">Cancel</button><button id="project-save" type="submit" class="primary" data-i18n="ops.save">Save follow-up</button></div></form></dialog>
   <dialog id="detail-dialog"><div class="dialog-head"><div><p class="eyebrow" id="detail-eyebrow"></p><h2 id="detail-title"></h2></div><button class="icon-button" data-close-dialog data-i18n-aria="action.close">&#215;</button></div><div id="detail-body" class="dialog-body"></div><div id="detail-actions" class="dialog-actions"></div></dialog>
   <dialog id="confirm-dialog"><div class="dialog-head"><h2 id="confirm-title" data-i18n="confirm.title">Confirm action</h2><button class="icon-button" data-cancel-confirm data-i18n-aria="action.close">&#215;</button></div><p id="confirm-message"></p><label id="confirm-note-wrap" class="hidden"><span data-i18n="confirm.note">Review note</span><textarea id="confirm-note" maxlength="1000"></textarea></label><div class="dialog-actions"><button data-cancel-confirm data-i18n="action.cancel">Cancel</button><button id="confirm-action" class="danger" data-i18n="action.confirm">Confirm</button></div></dialog>
 </body>

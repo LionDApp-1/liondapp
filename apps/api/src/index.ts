@@ -1,4 +1,5 @@
 import { adminAuthRoute } from "./admin-password";
+import { operationsRoute } from "./operations";
 import { PublicKey } from "@solana/web3.js";
 import { requireAdmin, requireAccessAdmin } from "./admin";
 import { optionalSession, requireSession, resolveSkrDomain } from "./auth";
@@ -592,6 +593,7 @@ async function announcements(env: Env): Promise<Response> {
 
 async function adminRoute(path: string, request: Request, env: Env): Promise<Response> {
   const admin = await requireAdmin(request, env);
+  if (path.startsWith('/admin/operations/')) return operationsRoute(path, request, env, admin);
   if (request.method === "GET" && path === "/admin/overview") {
     const since = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
     const generatedAt = now();
@@ -623,7 +625,10 @@ async function adminRoute(path: string, request: Request, env: Env): Promise<Res
     return json({ items: result.results.map(serializeNeed) });
   }
   if (request.method === "GET" && path === "/admin/works") {
-    const result = await env.DB.prepare("SELECT * FROM works WHERE deleted_at IS NULL ORDER BY moderation_status='pending' DESC,created_at DESC LIMIT 200").all();
+    const focusId = new URL(request.url).searchParams.get('id');
+    const result = focusId
+      ? await env.DB.prepare("SELECT * FROM works WHERE deleted_at IS NULL AND id=?").bind(focusId).all()
+      : await env.DB.prepare("SELECT * FROM works WHERE deleted_at IS NULL ORDER BY moderation_status='pending' DESC,CASE WHEN moderation_status='pending' THEN created_at END ASC,created_at DESC LIMIT 200").all();
     return json({ items: result.results.map((row) => ({ ...serializeWork(row), policy_violation: !isPublicContentAllowed("work", row) })) });
   }
   const reviewId = match(path, /^\/admin\/works\/([^/]+)\/review$/);
@@ -655,7 +660,7 @@ async function adminRoute(path: string, request: Request, env: Env): Promise<Res
       LEFT JOIN works w ON r.target_type='work' AND w.id=r.target_id
       LEFT JOIN comments c ON r.target_type='comment' AND c.id=r.target_id
       LEFT JOIN users u ON r.target_type='profile' AND u.skr_domain=r.target_id
-      ORDER BY r.status='open' DESC,r.created_at DESC LIMIT 200`).all();
+      ORDER BY r.status='open' DESC,CASE WHEN r.status='open' THEN r.created_at END ASC,r.created_at DESC LIMIT 200`).all();
     return json({ items: result.results });
   }
   if (request.method === "GET" && path === "/admin/comments") {
@@ -928,6 +933,9 @@ async function runRetentionCleanup(env: Env): Promise<void> {
   ].filter(Boolean);
   await Promise.all(mediaKeys.map((key) => env.MEDIA.delete(key)));
   const results = await env.DB.batch([
+    env.DB.prepare(`DELETE FROM operations_projects WHERE
+      (target_type='need' AND EXISTS(SELECT 1 FROM needs n WHERE n.id=target_id AND n.deleted_at IS NOT NULL AND n.deleted_at<?)) OR
+      (target_type='work' AND EXISTS(SELECT 1 FROM works w WHERE w.id=target_id AND w.deleted_at IS NOT NULL AND w.deleted_at<?))`).bind(thirtyDaysAgo,thirtyDaysAgo),
     env.DB.prepare("DELETE FROM sessions WHERE expires_at < ? OR revoked_at IS NOT NULL").bind(currentTime),
     env.DB.prepare("DELETE FROM auth_challenges WHERE expires_at < ? AND NOT EXISTS (SELECT 1 FROM sessions WHERE sessions.challenge_id=auth_challenges.id)").bind(oneDayAgo),
     env.DB.prepare("DELETE FROM rate_limits WHERE window_started_at < ?").bind(Math.floor((timestamp - 86_400_000) / 1000)),
