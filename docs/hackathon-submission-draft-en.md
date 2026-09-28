@@ -42,6 +42,16 @@ Current baseline: LionDApp verifies `.skr` domain ownership for community identi
 - Direct Android APK URL: `https://raw.githubusercontent.com/LionDApp-1/liondapp/main/submission/LionDApp-release.apk`
 - APK SHA-256: `9584ee4e643dbd522b3d65db7d5d8e4df51f8bfc25966ccb433332e95e57d739`
 
+## Demo video production guidance
+
+The official brief requires a working Android build and a three-minute demo; it does not state that the presenter must appear on camera or that narration must be in English. The safest submission is a real screen recording from the physical Seeker, with optional AI-assisted English narration and subtitles. AI may help with the script, voice-over, captions, pacing and title cards, but it should not fabricate UI, device behavior, wallet signatures, users, transactions or performance claims.
+
+Recommended format: 16:9 or a clean portrait crop, maximum three minutes, real APK visible throughout, English on-screen labels/subtitles for international judges, and no seed phrases, private keys, passwords or personal data. A face is optional. An English AI voice is acceptable as an accessibility/presentation aid if it describes only what the recording actually shows.
+
+Suggested sequence: value proposition and home feed; search across community needs and the 1,000+ official Store catalog; Seed Vault / `.skr` identity sign-in; publish or draft a need/work; moderation and community interaction; profile and developer discovery; close with the Solana Mobile and non-custodial boundaries. The video should make clear that current SKR payments and tips are disabled in the submitted build.
+
+The submission page does not require the video to be publicly searchable. Use a stable HTTPS link accepted by the form, such as an unlisted YouTube or Vimeo URL if allowed. Anyone with an unlisted link can view it, and the hackathon terms say submissions are not confidential and may be used for judging, archival and publicity. Do not include secrets or confidential user data.
+
 ## Factual questions requiring owner confirmation
 
 - Did the team/project receive VC or angel funding? `No`
