@@ -36,10 +36,11 @@ Current baseline: LionDApp verifies `.skr` domain ownership for community identi
 
 ## Required links (to be filled)
 
-- Deck URL: `LionDApp_ClockIn_2026_Deck_EN.pptx` (local final artifact; upload and replace with public URL)
+- Deck URL: `https://raw.githubusercontent.com/LionDApp-1/liondapp/main/submission/LionDApp_ClockIn_2026_Deck_EN.pptx`
 - Demo video URL: `TBD`
-- GitHub repository URL: `TBD`
-- Direct Android APK URL: `TBD`
+- GitHub repository URL: `https://github.com/LionDApp-1/liondapp`
+- Direct Android APK URL: `https://raw.githubusercontent.com/LionDApp-1/liondapp/main/submission/LionDApp-release.apk`
+- APK SHA-256: `9584ee4e643dbd522b3d65db7d5d8e4df51f8bfc25966ccb433332e95e57d739`
 
 ## Factual questions requiring owner confirmation
 
