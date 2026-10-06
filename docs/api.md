@@ -1,5 +1,7 @@
 # API contract
 
+Updated 6 October 2026.
+
 Base URL: `https://api.liondapp.1ion.top`
 
 ## Public
@@ -103,7 +105,7 @@ only public metadata sourced from the official Solana dApp Store; its
 
 ## Paid development and private messages (2026-09-16)
 
-`POST /v1/needs` additionally accepts `requestType: "free" | "paid_development"` and `budgetSkr` (whole integer 1–1,000,000,000 for paid requests). Omitted type is free. Budgets are statements of intent, never verified funds. All need feed sorts and need search results prioritize paid requests by budget, then the selected secondary sort.
+`POST /v1/needs` additionally accepts `requestType: "free" | "paid_development"` and `budgetSkr` (whole integer 1–1,000,000,000 for paid requests). Omitted type is free. Budgets are statements of intent, never verified funds. Budgets do not override the selected sort; the community feed supports an explicit paid-request filter.
 
 All conversation endpoints require a session; conversation and message IDs are not authorization.
 
@@ -151,3 +153,41 @@ remains available while the new-tip switch is off, provided the RPC is usable.
 - Catalog status includes `translation_enabled` and `translation_failed`.
 - `/v1/config` includes `catalog: {active, translated}` for catalog coverage reporting. The homepage search hint uses “1,000+” per the owner’s UI preference.
 - Serialized works include `public_visibility` (`visible`, `hidden_policy`, `not_published`) independently of the original `moderation_status`; owners retain access to their hidden records.
+## Community feedback and testing additions
+
+## dApp Testing Campaigns
+
+`GET /v1/campaigns/config` exposes the bounty payment gate separately from legacy recommendations and donations. Real payments are unavailable; the config includes the owner-provided public `feeRecipient`, not a deployed escrow address. Simulation requires explicit bounty, Devnet and payment simulation gates together.
+
+- `GET /v1/campaigns?scope=open|joined|mine&limit=30&cursor=`: open recruitment, own participation, or hosted campaigns. Private scopes require a session. Limit 1–50; responses include `nextCursor` (null at the end), ordered by creation time and ID. Pass the cursor unchanged and URL-encoded. Paid unfunded drafts, including cancelled drafts, are visible only to their creator. Disabled simulations are excluded from public recruitment.
+- `POST /v1/campaigns`: `title`, `description`, `appVersion`, `requirements`, `storePackage`, `minCharacters` (20–2000), `capacity` (1–1000), `reservationHours` (1–72), `rewardSkr` (decimal string, at most 6 decimal places), `deadline` (ISO, 1 hour–30 days ahead). Zero reward publishes a free invitation; a positive reward creates an unfunded draft.
+- `PUT /v1/campaigns/:id`: the creation fields plus exact `revision`. Creator-only, private/unfunded/awaiting-funding only; positive reward required. Moderation runs again; stale edits return 409. Published terms cannot be edited.
+- `GET /v1/campaigns/:id`: rules, `revision`, counts, own entry, pool, fee paid, locked and unallocated units. Unfunded drafts have zero actual locked/refundable funds. Monetary values are integer strings in 6-decimal units. `GET .../entries` is host-only.
+- `POST /v1/campaigns/:id/join`: reserve one slot per identity and wallet, atomically bounded by capacity; cannot join your own activity. Expiration releases reservations, never submitted or disputed results.
+- `POST .../close`: stop recruitment, preserving existing participants' submission/review rights. `POST .../complete` finishes a free campaign once all entries are settled or released.
+- `POST .../simulate-fund`, `.../simulate-refund`: strictly gated simulation. Refund requires closure and no unsettled reservations, results or appeal holds.
+- `POST /v1/testing-entries/:id/submit`: `revision`, `body`, optional `evidenceUrl` (HTTPS). NFC-normalized character count excludes whitespace, format and control characters. Comments are separate from report submissions.
+- `POST .../review`: host-only `revision`, `decision` (`approve|changes|reject`), `reason` for changes/rejection. One correction, 72-hour review deadline. Paid approval awaits settlement; free approval completes the result without a payment signature.
+- `POST .../withdraw`, `.../appeal`: tester-only `revision`, plus appeal `reason`. Rejected results have a 72-hour appeal window. Overdue submissions are also eligible for platform review.
+- `POST .../simulate-settle`: host-only simulation of an approved result, once, using an atomic revision guard; records a `simulation:` receipt.
+- `GET /admin/testing-reviews`: authenticated admin queue of disputes and overdue submissions. `POST /admin/testing-entries/:id/resolve`: `revision`, boolean `approve`, and required `reason`; generates one audit record and participant notifications. Rejection releases the hold immediately; approval still requires settlement.
+
+Every successful result transition generates exactly one audit event and notification under concurrent requests. Account deletion is blocked while campaign obligations remain. A blocked host is hidden publicly, but enrolled testers retain access to existing obligations. Linked campaign posts expose `campaign_id`, `campaign_reward_units`, `campaign_funding_state`, and `campaign_status`, and cannot alter locked terms through the regular post editor.
+
+- `GET /v1/discover`: real testing/resolved/feedback/popular sections, viewer block filtering.
+- `GET /v1/needs`: `kind`, `status`, `paid` filters; budgets do not override sort.
+- `POST /v1/needs`: `kind=feedback`, `feedbackType=issue|suggestion|praise`, `storePackage` required for feedback; solution/audience optional.
+- `PUT /v1/needs/:id`: full moderated replacement with exact `revision`; stale versions return 409, only author permitted.
+- `PUT|DELETE /v1/needs/:id/follow`: `wantsTest` boolean for PUT; idempotent preference persistence.
+- `GET /v1/following`, `GET /v1/following-apps`: private account subscriptions.
+- `GET|PUT|DELETE /v1/store-apps/:package/follow`: own app subscription status/mutation.
+- `GET /v1/store-apps/:package/feedback`: public feedback for one app, respects viewer blocks.
+- `POST /v1/needs/:id/comments`: optional `responseKind`, `linkedStorePackage`, `linkedWorkId`; catalog and published-work references validated.
+- `POST /v1/needs/:id/progress`: author only, `revision`, `status`, `body`, optional app/work links; atomic outcome comment and follower notification.
+- `POST /v1/notifications/:id/read`: recipient only; notifications include safe navigation payloads.
+
+All community writes use existing wallet session, moderation and rate controls. They do not verify developer affiliation. Community requires 0017, campaign review 0018/0019, and draft editing 0020. Paid settlement remains simulation-only.
+
+## Public website proxy
+
+The public Pages site exposes `GET /api/catalog?q=` (12 sanitized Store metadata results) and `GET /api/status` (availability, bounty mode and check time). These are website routes, not additions to the Worker base URL. No client credential, arbitrary target path or authenticated mutation is forwarded. Other API proxy paths return 404; non-GET methods return 405. See `apps/site/functions/api/[[path]].ts`.

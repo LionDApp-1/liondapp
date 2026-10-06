@@ -1,49 +1,11 @@
-# Testing
+# Verification and reproducibility
 
-Run the comprehensive local API, schema, security, and packaging checks after
-Node dependencies are installed:
+Run `npm ci`, `npm test`, `npm run api:typecheck` and `npm run site:typecheck` on Node 22.13+ before reviewing the Android build. Test fixtures are synthetic and isolated; they are not actual customer or payment evidence.
 
-```bash
-bash scripts/verify.sh
-```
+Android: `./gradlew :apps:mobile:app:assembleDebug :apps:mobile:app:testDebugUnitTest :apps:mobile:app:lintDebug --no-configuration-cache` with JDK17 and SDK36. QA instrumentation builds use `.qa`, mocks and independent storage; use `scripts/verify-seeker.sh` only on a USB-connected device you control. The normal release login still requires the owner's wallet approval and current `.skr` ownership.
 
-This includes API contract and exact-unit tests, an in-memory D1/SQLite migration,
-single-use challenge enforcement, promoted/natural list separation,
-counter-trigger behavior, bounded request parsing, WebP metadata sanitation,
-Pages security headers, Worker type checking/dry-run bundling, Android XML
-parsing, and a basic secret scan.
+Historical owner-authorized physical checks: two independent identities completed a free campaign with correction, approval and closure on 1.2.0. 1.2.1 was installed on both Seekers and verified for upgrade, session persistence, existing report history, network retry and navigation. The isolated Android regression suite had 38 passing cases. Full mainnet SKR funding, payouts and other-wallet identity switching are not verified.
 
-For individual API/database checks:
+Escrow tests: `cargo test --locked --manifest-path programs/testing-escrow/Cargo.toml`; optional `scripts/verify-escrow.sh` follows the pinned toolchain in the program README and runs 13 local account/CPI cases. No public deployment or payment is implied.
 
-```bash
-npm run api:typecheck
-npx wrangler d1 migrations apply liondapp --local --config apps/api/wrangler.toml
-```
-
-On this development Mac, the verification wrapper locates the installed JDK 17
-and Android SDK without changing global shell settings:
-
-```bash
-bash scripts/android-verify.sh
-```
-
-Before declaring a release candidate, run the skill preflight:
-
-```bash
-bash /Users/cuizepengdemac/.codex/skills/solana-mobile-dapp-developer/scripts/preflight.sh /Users/cuizepengdemac/Documents/dapp撮合平台
-```
-
-Then complete `docs/release-checklist.md` on a physical Seeker.
-
-The current skill preflight also checks for an Expo `app.json`. LionDApp is a
-native Kotlin project, so that single failure is not applicable. Do not add a
-fake Expo configuration to silence it; use the Gradle, APK, signer, and physical
-device evidence required for the native Android path.
-
-The preflight warning about a missing release APK is expected until the owner
-creates and backs up the dedicated release signing key. The Devnet APK is signed
-with Android Debug and must never be submitted.
-
-Lint also calls `mipmap-anydpi-v26` unnecessary because `minSdk` is 26. The
-version qualifier is intentionally retained: AAPT requires adaptive-icon XML to
-remain API-qualified even when all supported devices are API 26 or newer.
+Latest public-snapshot checks are recorded in `submission/source-verification.json`; these describe exactly what was rerun after synchronization.

@@ -24,8 +24,26 @@ def find_tools(sdk):
     return max(candidates, key=lambda path: tuple(map(int, path.name.split('.')))) / 'apksigner'
 
 
+def check_certificate(root, expected):
+    """Pin updates to the original public certificate, not just a selected key."""
+    if not re.fullmatch(r'[a-f0-9]{64}', expected):
+        raise ValueError('Expected a lowercase SHA-256 public certificate fingerprint')
+    baseline = root / 'apps/mobile/release-identity.json'
+    if baseline.exists():
+        identity = json.loads(baseline.read_text())
+        if identity.get('package') != 'top.oneion.liondapp' or not re.fullmatch(
+            r'[a-f0-9]{64}', identity.get('signerSha256', '')
+        ):
+            raise ValueError('Release identity baseline is malformed')
+        if expected != identity['signerSha256']:
+            raise ValueError('Selected certificate differs from the original release identity; restore the original key')
+    elif any((root / 'artifacts').glob('release-*/release-evidence.json')):
+        raise ValueError('An existing release requires its public certificate baseline; do not create a replacement identity')
+
+
 def record(apk, signer, expected):
     root = Path(__file__).resolve().parents[1]
+    check_certificate(root, expected)
     certs = subprocess.check_output([str(signer), 'verify', '--print-certs', str(apk)], text=True)
     fingerprints = re.findall(r'^Signer #\d+ certificate SHA-256 digest: ([a-f0-9]{64})$', certs, re.M)
     if fingerprints != [expected] or 'CN=Android Debug' in certs:
@@ -53,6 +71,10 @@ def record(apk, signer, expected):
 
 
 if __name__ == '__main__':
+    if len(sys.argv) == 3 and sys.argv[1] == '--check-certificate':
+        check_certificate(Path(__file__).resolve().parents[1], sys.argv[2])
+        print('Public certificate matches release identity.')
+        sys.exit(0)
     if len(sys.argv) == 3 and sys.argv[1] == '--find-tools':
         print(find_tools(Path(sys.argv[2]).resolve()))
         sys.exit(0)

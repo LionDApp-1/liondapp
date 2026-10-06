@@ -1,0 +1,123 @@
+1
+00:00:00,550 --> 00:00:02,916
+Every dApp begins with an idea.
+
+2
+00:00:03,096 --> 00:00:06,478
+It becomes useful when real people help it improve.
+
+3
+00:00:06,658 --> 00:00:12,897
+LionDApp connects Seeker users and builders through discovery, honest feedback, and structured testing.
+
+4
+00:00:13,577 --> 00:00:16,632
+Start with the Solana dApp Store catalog.
+
+5
+00:00:16,812 --> 00:00:21,486
+Find an app, explore its details, and see the community conversation around it.
+
+6
+00:00:21,666 --> 00:00:28,008
+Catalog information stays separate from community opinions, so users understand what they are reading.
+
+7
+00:00:28,688 --> 00:00:31,037
+Choose the app you actually used.
+
+8
+00:00:31,217 --> 00:00:34,789
+Share an issue, a suggestion, or something worth praising.
+
+9
+00:00:34,969 --> 00:00:40,435
+Clear sections keep the experience readable; comments and replies have their own space.
+
+10
+00:00:40,615 --> 00:00:43,371
+Follow the conversation as it develops.
+
+11
+00:00:43,551 --> 00:00:46,537
+The goal is feedback a builder can act on.
+
+12
+00:00:47,217 --> 00:00:50,930
+Builders can invite people to test a specific app version.
+
+13
+00:00:51,110 --> 00:00:56,578
+Define the steps, number of places, deadline, and report requirements before anyone joins.
+
+14
+00:00:56,758 --> 00:01:00,624
+Testers reserve a place and submit a dedicated report.
+
+15
+00:01:00,804 --> 00:01:05,396
+Hosts can request a correction, then review it against those requirements.
+
+16
+00:01:05,576 --> 00:01:08,443
+A negative finding can still be valuable.
+
+17
+00:01:09,123 --> 00:01:16,131
+Participation uses Mobile Wallet Adapter, wallet signatures, and verified .skr ownership.
+
+18
+00:01:16,311 --> 00:01:18,164
+Browsing stays open.
+
+19
+00:01:18,344 --> 00:01:22,689
+Reporting, blocking, and moderation support safer conversations.
+
+20
+00:01:22,869 --> 00:01:27,979
+This verifies account control; it does not certify that someone represents an app.
+
+21
+00:01:28,659 --> 00:01:31,673
+English is our default for a global community.
+
+22
+00:01:31,853 --> 00:01:39,237
+Chinese helps Seeker owners who are less comfortable with English understand the interface and participate more confidently.
+
+23
+00:01:39,417 --> 00:01:42,384
+Community posts keep their original language.
+
+24
+00:01:42,564 --> 00:01:45,546
+We will add more languages based on feedback.
+
+25
+00:01:46,226 --> 00:01:48,271
+Free testing works today.
+
+26
+00:01:48,451 --> 00:01:56,420
+Our next step is creator funded SKR testing, with rewards and a ten percent platform fee deposited before recruitment.
+
+27
+00:01:56,600 --> 00:01:59,583
+Real funding and payouts are not live yet.
+
+28
+00:01:59,763 --> 00:02:02,477
+We will build and validate them carefully.
+
+29
+00:02:03,157 --> 00:02:08,011
+Our vision is a shared feedback layer where users help builders create better dApps.
+
+30
+00:02:08,191 --> 00:02:12,585
+We are committed to listening, testing, and improving, release after release.
+
+31
+00:02:12,765 --> 00:02:19,559
+Better service for users, stronger products for developers, and a healthier Solana dApp Store for the long term.

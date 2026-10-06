@@ -19,7 +19,12 @@ SKR_DECIMALS = "6"
 SESSION_TTL_SECONDS = "86400"
 PAYMENT_MODE = "simulation"
 DONATIONS_ENABLED = "false"
+BOUNTY_MODE = "disabled"
+BOUNTY_FEE_RECIPIENT = "11111111111111111111111111111111"
 SOLANA_RPC_URL = "https://api.devnet.solana.com"
+
+[triggers]
+crons = ["17 */4 * * *", "*/2 * * * *"]
 
 [ai]
 binding = "AI"

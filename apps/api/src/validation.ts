@@ -25,6 +25,13 @@ function category(value: unknown): string {
 }
 
 export function needPayload(body: Record<string, unknown>) {
+  const kind = body.kind ?? 'need';
+  if (kind !== 'need' && kind !== 'feedback') throw new ApiError(400, 'invalid_need_kind');
+  const feedbackType = kind === 'feedback' ? body.feedbackType ?? 'suggestion' : null;
+  if (feedbackType !== null && !['issue','suggestion','praise'].includes(String(feedbackType))) throw new ApiError(400, 'invalid_feedback_type');
+  const storePackage = optionalText(body.storePackage, 'store_package', 200);
+  if (kind === 'feedback' && !storePackage) throw new ApiError(400, 'feedback_app_required');
+  const common = { kind, feedbackType, storePackage };
   const requestType = body.requestType === "paid_development" ? "paid_development" : body.requestType === undefined || body.requestType === "free" ? "free" : null;
   if (!requestType) throw new ApiError(400, "invalid_request_type");
   const rawBudget = body.budgetSkr;
@@ -37,12 +44,14 @@ export function needPayload(body: Record<string, unknown>) {
   const format = body.format === undefined ? "structured" : body.format;
   if (format !== "structured" && format !== "wild") throw new ApiError(400, "invalid_need_format");
   if (format === "wild") {
+    if (kind === 'feedback') throw new ApiError(400, 'invalid_need_format');
     return {
+      ...common,
       format,
       title: text(body.title, "title", 120),
       problem: text(body.problem, "idea", 5000),
       solutionIdea: "",
-      audience: text(body.audience, "audience", 500),
+      audience: optionalText(body.audience, "audience", 500) ?? '',
       category: "天马行空",
       tags: [],
       mediaKeys,
@@ -51,12 +60,13 @@ export function needPayload(body: Record<string, unknown>) {
     };
   }
   return {
+    ...common,
     format,
     title: text(body.title, "title", 120),
     problem: text(body.problem, "problem", 5000),
-    solutionIdea: text(body.solutionIdea, "solution_idea", 5000),
-    audience: text(body.audience, "audience", 500),
-    category: category(body.category),
+    solutionIdea: optionalText(body.solutionIdea, "solution_idea", 5000) ?? '',
+    audience: optionalText(body.audience, "audience", 500) ?? '',
+    category: category(body.category ?? '其他'),
     tags: list(body.tags ?? [], "tags", 5).map((tag) => text(tag, "tag", 32)),
     mediaKeys,
     requestType,
@@ -70,6 +80,7 @@ export function workPayload(body: Record<string, unknown>) {
   const screenshotKeys = list(body.screenshotKeys ?? [], "screenshot_keys", 5);
   if (screenshotKeys.length < 2) throw new ApiError(400, "work_images_3_to_6_required");
   return {
+    storePackage: optionalText(body.storePackage, 'store_package', 200),
     name: text(body.name, "name", 120),
     summary: text(body.summary, "summary", 240),
     description: text(body.description, "description", 8000),

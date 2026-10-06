@@ -71,6 +71,17 @@ data class LionUiState(
     val skrDomain: String? = null,
     val error: String? = null,
     val comments: List<CommentItem> = emptyList(),
+    val commentsLoading: Boolean = false,
+    val commentsError: String? = null,
+    val campaigns: List<top.oneion.liondapp.model.TestingCampaign> = emptyList(),
+    val campaign: top.oneion.liondapp.model.TestingCampaign? = null,
+    val campaignEntries: List<top.oneion.liondapp.model.TestingEntry> = emptyList(),
+    val campaignConfig: top.oneion.liondapp.model.CampaignConfig = top.oneion.liondapp.model.CampaignConfig(),
+    val campaignsLoading: Boolean = false,
+    val campaignsCursor: String? = null,
+    val campaignsScope: String = "open",
+    val campaignError: String? = null,
+    val campaignBusy: Boolean = false,
     val myNeeds: List<NeedItem> = emptyList(),
     val myWorks: List<WorkItem> = emptyList(),
     val notifications: List<NotificationItem> = emptyList(),
@@ -81,6 +92,17 @@ data class LionUiState(
     val profileWorks: List<WorkItem> = emptyList(),
     val myProfile: PublicProfile? = null,
     val workSubmission: WorkSubmissionState = WorkSubmissionState(),
+    val discovery: DiscoveryResponse = DiscoveryResponse(),
+    val following: List<NeedItem> = emptyList(),
+    val followingApps: List<StoreAppItem> = emptyList(),
+    val appFollowing: Boolean = false,
+    val detailLoading: Boolean = false,
+    val detailNeed: NeedItem? = null,
+    val appFeedback: List<NeedItem> = emptyList(),
+    val catalogResults: List<StoreAppItem> = emptyList(),
+    val catalogLoading: Boolean = false,
+    val catalogError: String? = null,
+    val communityBusy: Boolean = false,
 )
 
 enum class WorkSubmissionPhase { Idle, Uploading, Creating, Success, Error }
@@ -105,6 +127,15 @@ class LionViewModel internal constructor(context: Context, private val api: ApiC
     private val chatRefreshMutex = Mutex()
     private var chatGeneration = 0L
     private var profileGeneration = 0L
+    private var feedGeneration = 0L
+    private var detailGeneration = 0L
+    private var catalogGeneration = 0L
+    private var commentGeneration = 0L
+    private var commentTarget: Pair<String, String>? = null
+    private var commentSort = "top"
+    private var campaignGeneration = 0L
+    private var campaignDetailGeneration = 0L
+    private var campaignScope = "open"
 
     override fun onCleared() {
         api.close()
@@ -118,12 +149,19 @@ class LionViewModel internal constructor(context: Context, private val api: ApiC
         loadConversations()
     }
 
-    fun refresh(needSort: String = "latest", workSort: String = "latest", needCategory: String? = null, workCategory: String? = null) {
+    fun refresh(needSort: String = "latest", workSort: String = "latest", needCategory: String? = null, workCategory: String? = null, needKind: String? = null, needStatus: String? = null, paid: Boolean = false) {
+        val generation = ++feedGeneration
         viewModelScope.launch {
             mutableState.value = mutableState.value.copy(loading = true, error = null)
             runCatching {
-                Triple(api.config(), api.needs(needSort, needCategory), api.works(workSort, workCategory))
-            }.onSuccess { (config, needs, works) ->
+                val config = api.config()
+                val needs = api.needs(needSort, needCategory, needKind, needStatus, paid)
+                val works = api.works(workSort, workCategory)
+                val discovery = api.discover()
+                Triple(config, needs, works) to discovery
+            }.onSuccess { (feed, discovery) ->
+                if (generation != feedGeneration) return@onSuccess
+                val (config, needs, works) = feed
                 mutableState.value = mutableState.value.copy(
                     loading = false,
                     config = config,
@@ -132,8 +170,11 @@ class LionViewModel internal constructor(context: Context, private val api: ApiC
                     storeApps = emptyList(),
                     promoted = works.promoted,
                     searchActive = false,
+                    discovery = discovery,
                 )
             }.onFailure { error ->
+                if (error is CancellationException) throw error
+                if (generation != feedGeneration) return@onFailure
                 val sessionExpired = clearExpiredSession(error)
                 mutableState.value = mutableState.value.copy(loading = false, error = if (sessionExpired) null else error.message)
             }
@@ -142,11 +183,14 @@ class LionViewModel internal constructor(context: Context, private val api: ApiC
 
     fun search(query: String) {
         if (query.trim().length < 2) return refresh()
+        val generation = ++feedGeneration
         viewModelScope.launch {
             mutableState.value = mutableState.value.copy(loading = true, error = null)
             runCatching { api.search(query.trim()) }
-                .onSuccess { mutableState.value = mutableState.value.copy(loading = false, needs = it.needs, works = it.works, storeApps = it.storeApps, promoted = emptyList(), searchActive = true) }
+                .onSuccess { if (generation == feedGeneration) mutableState.value = mutableState.value.copy(loading = false, needs = it.needs, works = it.works, storeApps = it.storeApps, promoted = emptyList(), searchActive = true) }
                 .onFailure {
+                    if (it is CancellationException) throw it
+                    if (generation != feedGeneration) return@onFailure
                     val sessionExpired = clearExpiredSession(it)
                     mutableState.value = mutableState.value.copy(loading = false, error = if (sessionExpired) null else it.message)
                 }
@@ -163,6 +207,7 @@ class LionViewModel internal constructor(context: Context, private val api: ApiC
                     mutableState.value = mutableState.value.copy(authenticating = false, skrDomain = response.user.skrDomain)
                     loadMe()
                     loadConversations()
+                    refresh()
                 }
                 .onFailure { mutableState.value = mutableState.value.copy(authenticating = false, error = it.message) }
         }
@@ -176,12 +221,16 @@ class LionViewModel internal constructor(context: Context, private val api: ApiC
         if (token != null) viewModelScope.launch { runCatching { api.logout(token) } }
     }
 
-    fun publishNeed(request: CreateNeedRequest, onDone: (Boolean) -> Unit) {
+    fun publishNeed(request: CreateNeedRequest, onDone: (Boolean) -> Unit, editingId: String? = null) {
         if (mutableState.value.publishingNeed) return
         mutableState.value = mutableState.value.copy(publishingNeed = true, error = null)
+        val token = api.sessionToken
         viewModelScope.launch {
-            try { api.createNeed(request); onDone(true) }
-            catch (e: Exception) { if (e is CancellationException) throw e; mutableState.value = mutableState.value.copy(error = e.message); onDone(false) }
+            try {
+                if (editingId == null) api.createNeed(request) else api.updateNeed(editingId, request)
+                if (api.sessionToken == token) { onDone(true); loadMe(); refresh() }
+            }
+            catch (e: Exception) { if (e is CancellationException) throw e; if (api.sessionToken == token) { clearExpiredSession(e); mutableState.value = mutableState.value.copy(error = e.message); onDone(false) } }
             finally { mutableState.value = mutableState.value.copy(publishingNeed = false) }
         }
     }
@@ -226,25 +275,163 @@ class LionViewModel internal constructor(context: Context, private val api: ApiC
         mutableState.value = mutableState.value.copy(workSubmission = WorkSubmissionState())
     }
 
+    fun loadCampaigns(scope: String = campaignScope, more: Boolean = false) {
+        val cursor = if(more) state.value.campaignsCursor ?: return else null
+        if(more && state.value.campaignsLoading) return
+        campaignScope = scope
+        val generation = ++campaignGeneration
+        val token = api.sessionToken
+        mutableState.value = mutableState.value.copy(campaignsScope = scope, campaignsLoading = true, campaignError = null, campaigns = if(more) state.value.campaigns else emptyList(), campaignsCursor = if(more) cursor else null)
+        viewModelScope.launch {
+            runCatching { api.campaignConfig() to api.campaigns(scope,cursor) }.onSuccess { (config, feed) ->
+                if (generation == campaignGeneration && token == api.sessionToken) mutableState.value = mutableState.value.copy(campaigns = (if(more) mutableState.value.campaigns + feed.items else feed.items).distinctBy { it.id }, campaignsCursor = feed.nextCursor, campaignConfig = config, campaignsLoading = false)
+            }.onFailure {
+                if (it is CancellationException) throw it
+                if (generation == campaignGeneration && token == api.sessionToken) mutableState.value = mutableState.value.copy(campaignsLoading = false, campaignError = if (it is java.io.IOException) "network_unavailable" else it.message)
+            }
+        }
+    }
+
+    fun loadCampaign(id: String) {
+        val generation = ++campaignDetailGeneration
+        val token = api.sessionToken
+        mutableState.value = mutableState.value.copy(campaign = null, campaignEntries = emptyList(), campaignError = null)
+        viewModelScope.launch {
+            runCatching {
+                val config = api.campaignConfig()
+                val item = api.campaign(id)
+                val entries = if (item.creatorSkr == state.value.skrDomain) api.campaignEntries(id).items else emptyList()
+                Triple(item,entries,config)
+            }.onSuccess { (item, entries, config) ->
+                if (generation == campaignDetailGeneration && token == api.sessionToken) {
+                    val current = mutableState.value
+                    val feed = current.campaigns.mapNotNull { cached ->
+                        when {
+                            cached.id != item.id -> cached
+                            current.campaignsScope == "open" && item.status != "open" -> null
+                            else -> item
+                        }
+                    }
+                    mutableState.value = current.copy(campaign = item, campaignEntries = entries, campaignConfig = config, campaigns = feed)
+                }
+            }
+                .onFailure { if (it is CancellationException) throw it; if (generation == campaignDetailGeneration && token == api.sessionToken) mutableState.value = mutableState.value.copy(campaignError = if (it is java.io.IOException) "network_unavailable" else it.message) }
+        }
+    }
+
+    private fun campaignMutation(onDone: (Boolean) -> Unit = {}, operation: suspend () -> Unit) {
+        if (state.value.campaignBusy) return
+        val token = api.sessionToken
+        mutableState.value = mutableState.value.copy(campaignBusy = true, campaignError = null)
+        viewModelScope.launch {
+            try { operation(); if (token == api.sessionToken) { mutableState.value = mutableState.value.copy(campaignBusy = false); loadCampaigns(); onDone(true) } }
+            catch (error: Exception) { if (error is CancellationException) throw error; if (token == api.sessionToken) { mutableState.value = mutableState.value.copy(campaignBusy = false, campaignError = if (error is java.io.IOException) "network_unavailable" else error.message); onDone(false) } }
+        }
+    }
+
+    fun createCampaign(request: top.oneion.liondapp.model.CreateCampaignRequest, onDone: (Boolean) -> Unit) = campaignMutation(onDone) { api.createCampaign(request); campaignScope = "mine" }
+    fun updateCampaign(id: String, request: top.oneion.liondapp.model.CreateCampaignRequest, onDone: (Boolean) -> Unit) = campaignMutation(onDone) { api.updateCampaign(id,request); loadCampaign(id) }
+    fun campaignAction(id: String, action: String) = campaignMutation { api.campaignAction(id,action); loadCampaign(id) }
+    fun submitTestingReport(campaignId: String, entry: top.oneion.liondapp.model.TestingEntry, body: String, evidence: String, done: (Boolean) -> Unit) = campaignMutation(done) { api.submitTestingReport(entry.id,top.oneion.liondapp.model.TestingReportRequest(entry.revision,body,evidence)); loadCampaign(campaignId) }
+    fun reviewTestingReport(campaignId: String, entry: top.oneion.liondapp.model.TestingEntry, decision: String, reason: String, done: (Boolean) -> Unit) = campaignMutation(done) { api.reviewTestingReport(entry.id,top.oneion.liondapp.model.TestingReviewRequest(entry.revision,decision,reason)); loadCampaign(campaignId) }
+    fun testingEntryAction(campaignId: String, entry: top.oneion.liondapp.model.TestingEntry, action: String, reason: String = "", done: (Boolean) -> Unit = {}) = campaignMutation(done) { api.testingEntryAction(entry.id,action,top.oneion.liondapp.model.TestingActionRequest(entry.revision,reason)); loadCampaign(campaignId) }
+
     fun toggleNeed(id: String) = launchMutation { api.reactToNeed(id); refresh() }
     fun toggleWork(id: String) = launchMutation { api.reactToWork(id); refresh() }
     fun toggleComment(id: String, kind: String, targetId: String) = launchMutation { api.reactToComment(id); loadComments(kind, targetId) }
 
-    fun loadComments(kind: String, id: String) {
-        mutableState.value = mutableState.value.copy(comments = emptyList())
+    fun loadComments(kind: String, id: String, sort: String = if (commentTarget == kind to id) commentSort else "top") {
+        val generation = ++commentGeneration
+        val token = api.sessionToken
+        val sameTarget = commentTarget == kind to id
+        commentTarget = kind to id
+        commentSort = sort
+        mutableState.value = mutableState.value.copy(comments = if (sameTarget) mutableState.value.comments else emptyList(), commentsLoading = true, commentsError = null, error = null)
         viewModelScope.launch {
-            runCatching { api.comments(kind, id) }
-                .onSuccess { mutableState.value = mutableState.value.copy(comments = it.items) }
+            runCatching { api.comments(kind, id, sort) }
+                .onSuccess { if (generation == commentGeneration && token == api.sessionToken) mutableState.value = mutableState.value.copy(comments = it.items, commentsLoading = false) }
                 .onFailure {
+                    if (it is CancellationException) throw it
+                    if (generation != commentGeneration || token != api.sessionToken) return@onFailure
                     val sessionExpired = clearExpiredSession(it)
-                    mutableState.value = mutableState.value.copy(error = if (sessionExpired) null else it.message)
+                    mutableState.value = mutableState.value.copy(commentsLoading = false, commentsError = if (sessionExpired) null else if (it is java.io.IOException) "network_unavailable" else it.message)
                 }
         }
     }
 
-    fun comment(kind: String, id: String, body: String, parentId: String? = null, onDone: (Boolean) -> Unit = {}) = launchMutation(onDone) {
-        api.comment(kind, id, body, parentId)
+    fun comment(kind: String, id: String, body: String, parentId: String? = null, responseKind: String = "discussion", linkedStorePackage: String? = null, linkedWorkId: String? = null, onDone: (Boolean) -> Unit = {}) = communityMutation(onDone) {
+        api.comment(kind, id, body, parentId, responseKind, linkedStorePackage, linkedWorkId)
         loadComments(kind, id)
+        if (kind == "need") loadNeed(id)
+        refresh()
+    }
+
+    fun searchCatalog(query: String = "") {
+        val generation = ++catalogGeneration
+        mutableState.value = mutableState.value.copy(catalogResults = emptyList(), catalogLoading = true, catalogError = null)
+        viewModelScope.launch {
+            try {
+                val apps = api.storeApps(query)
+                if (generation == catalogGeneration) mutableState.value = mutableState.value.copy(catalogResults = apps.items, catalogLoading = false)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                if (generation == catalogGeneration) mutableState.value = mutableState.value.copy(catalogLoading = false, catalogError = if (e is java.io.IOException) "network_unavailable" else e.message)
+            }
+        }
+    }
+
+    fun loadNeed(id: String, done: (NeedItem) -> Unit = {}) {
+        val generation = ++detailGeneration
+        val token = api.sessionToken
+        mutableState.value = mutableState.value.copy(detailNeed = null, detailLoading = true, error = null)
+        viewModelScope.launch {
+            try {
+                val need = api.need(id)
+                if (generation == detailGeneration && api.sessionToken == token) { mutableState.value = mutableState.value.copy(detailNeed = need, detailLoading = false); done(need) }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                if (generation == detailGeneration && api.sessionToken == token && !clearExpiredSession(e)) mutableState.value = mutableState.value.copy(error = e.message, detailLoading = false)
+            }
+        }
+    }
+
+    fun loadAppFeedback(packageName: String) {
+        val generation = ++detailGeneration
+        val token = api.sessionToken
+        mutableState.value = mutableState.value.copy(appFeedback = emptyList(), appFollowing = false, detailLoading = true)
+        viewModelScope.launch {
+            try {
+                val feedback = api.appFeedback(packageName)
+                val following = if (token != null) api.appFollowing(packageName).following else false
+                if (generation == detailGeneration && token == api.sessionToken) mutableState.value = mutableState.value.copy(appFeedback = feedback.items, appFollowing = following, detailLoading = false)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                if (generation == detailGeneration && token == api.sessionToken && !clearExpiredSession(e)) mutableState.value = mutableState.value.copy(error = e.message, detailLoading = false)
+            }
+        }
+    }
+
+    fun openApp(packageName: String, done: (StoreAppItem) -> Unit) = launchMutation { done(api.storeApp(packageName)) }
+    fun openWork(id: String, done: (WorkItem) -> Unit) = launchMutation { done(api.work(id)) }
+    fun followNeed(need: NeedItem, following: Boolean, wantsTest: Boolean = need.wantsTest) = communityMutation {
+        if (following) api.follow(need.id, wantsTest) else api.unfollow(need.id)
+        loadNeed(need.id); loadMe(); refresh()
+    }
+    fun updateProgress(need: NeedItem, status: String, body: String, app: String?, work: String?, done: (Boolean) -> Unit) = communityMutation(done) {
+        api.progress(need.id, ProgressRequest(status, body, need.revision, app, work))
+        loadNeed(need.id); loadComments("need", need.id); loadMe(); refresh()
+    }
+    fun readNotification(id: String) = launchMutation { api.readNotification(id); loadMe() }
+    fun followApp(packageName: String, following: Boolean) = communityMutation {
+        if (following) api.followApp(packageName) else api.unfollowApp(packageName)
+        loadAppFeedback(packageName); loadMe()
+    }
+
+    private fun communityMutation(done: (Boolean) -> Unit = {}, action: suspend () -> Unit) {
+        if (mutableState.value.communityBusy) return
+        val token = api.sessionToken
+        mutableState.value = mutableState.value.copy(communityBusy = true)
+        launchMutation({ ok -> if (token == api.sessionToken) { mutableState.value = mutableState.value.copy(communityBusy = false); done(ok) } }, action)
     }
 
     fun promoteWork(id: String, onDone: (Boolean) -> Unit) = launchMutation(onDone) {
@@ -457,16 +644,34 @@ class LionViewModel internal constructor(context: Context, private val api: ApiC
         }
     }
 
+    fun loadNotifications() {
+        val token = api.sessionToken ?: return
+        mutableState.value = mutableState.value.copy(error = null)
+        viewModelScope.launch {
+            try {
+                val notifications = api.notifications()
+                if (api.sessionToken == token) mutableState.value = mutableState.value.copy(notifications = notifications.items)
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                if (api.sessionToken == token && !clearExpiredSession(e)) mutableState.value = mutableState.value.copy(error = if (e is java.io.IOException) "network_unavailable" else e.message)
+            }
+        }
+    }
+
     fun loadMe() {
         val token = api.sessionToken ?: return
         viewModelScope.launch {
             try {
                 val me = api.me()
                 if (api.sessionToken != token) return@launch
+                // Show the verified account even when an independent preferences request fails.
+                mutableState.value = mutableState.value.copy(myProfile = me.profile, myNeeds = me.needs, myWorks = me.works)
                 val notifications = api.notifications()
                 if (api.sessionToken != token) return@launch
                 val blocks = api.blocks()
-                if (api.sessionToken == token) mutableState.value = mutableState.value.copy(myProfile = me.profile, myNeeds = me.needs, myWorks = me.works, notifications = notifications.items, blockedUsers = blocks.items)
+                val following = api.following()
+                val followingApps = api.followingApps()
+                if (api.sessionToken == token) mutableState.value = mutableState.value.copy(myProfile = me.profile, myNeeds = me.needs, myWorks = me.works, notifications = notifications.items, blockedUsers = blocks.items, following = following.items, followingApps = followingApps.items)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 if (api.sessionToken == token && !clearExpiredSession(e)) mutableState.value = mutableState.value.copy(error = e.message)
@@ -474,7 +679,7 @@ class LionViewModel internal constructor(context: Context, private val api: ApiC
         }
     }
 
-    fun deleteNeed(id: String) = launchMutation { api.deleteNeed(id); loadMe(); refresh() }
+    fun deleteNeed(id: String, done: (Boolean) -> Unit = {}) = launchMutation(done) { api.deleteNeed(id); loadMe(); refresh() }
     fun deleteWork(id: String, onDone: (Boolean) -> Unit = {}) = launchMutation(onDone) { api.deleteWork(id); loadMe(); refresh() }
 
     fun deleteAccount(onDone: (Boolean) -> Unit) = launchMutation(onDone) {
@@ -517,6 +722,8 @@ class LionViewModel internal constructor(context: Context, private val api: ApiC
 
     fun clearProfile() {
         profileGeneration++
+        detailGeneration++
+        commentGeneration++
         mutableState.value = mutableState.value.copy(profilePreview = null, profileNeeds = emptyList(), profileWorks = emptyList())
     }
 
@@ -616,21 +823,28 @@ class LionViewModel internal constructor(context: Context, private val api: ApiC
     private fun clearAccountState() {
         chatGeneration++
         profileGeneration++
+        campaignGeneration++
+        campaignDetailGeneration++
         mutableState.value = mutableState.value.copy(
             donationQuote = null, donationStatus = null, donationSignature = null, donationError = null,
             conversations = emptyList(), conversationCursor = null, activeChat = null, messages = emptyList(), messageCursor = null,
             chatError = null, chatDraft = "", chatClientId = UUID.randomUUID().toString(), chatSending = false, chatLoading = false,
             skrDomain = null, myProfile = null, myNeeds = emptyList(), myWorks = emptyList(), notifications = emptyList(), blockedUsers = emptyList(),
             profilePreview = null, profileNeeds = emptyList(), profileWorks = emptyList(),
+            campaigns = emptyList(), campaignsCursor = null, campaignsScope = "open", campaign = null, campaignEntries = emptyList(), campaignsLoading = false, campaignError = null, campaignBusy = false,
+            following = emptyList(), followingApps = emptyList(), appFollowing = false, detailNeed = null, detailLoading = false, comments = emptyList(), commentsLoading = false, commentsError = null, appFeedback = emptyList(), communityBusy = false,
         )
     }
 
     private fun launchMutation(onDone: (Boolean) -> Unit = {}, action: suspend () -> Unit) {
+        val token = api.sessionToken
         viewModelScope.launch {
             mutableState.value = mutableState.value.copy(error = null)
             runCatching { action() }
-                .onSuccess { onDone(true) }
+                .onSuccess { if (api.sessionToken == token) onDone(true) }
                 .onFailure {
+                    if (it is CancellationException) throw it
+                    if (api.sessionToken != token) return@onFailure
                     val error = if (clearExpiredSession(it)) "session_expired" else it.message
                     mutableState.value = mutableState.value.copy(error = error)
                     onDone(false)

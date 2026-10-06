@@ -1,6 +1,6 @@
 const API = "/api";
 const ADMIN_URL = "https://admin.liondapp.1ion.top";
-const SUPPORTED_VIEWS = ["overview", "projects", "works", "content", "reports", "people", "promotions", "system"];
+const SUPPORTED_VIEWS = ["overview", "projects", "works", "content", "reports", "testing", "people", "promotions", "system"];
 const store = {
   view: "overview",
   contentType: "needs",
@@ -11,6 +11,7 @@ const store = {
 
 const I18N = {
   en: {
+    "nav.testing": "Testing disputes", "testing.criteria": "Published criteria", "testing.report": "Testing result", "testing.appeal": "Tester's appeal", "testing.rejection": "Host's reason", "testing.overdue": "Review overdue", "testing.disputed": "Disputed", "testing.approve": "Approve result", "testing.reject": "Reject result", "testing.resolve": "Resolve testing dispute", "testing.resolveMessage": "Resolve against the published criteria. Approval reserves the reward for settlement; rejection releases the spot and its funds.", "testing.reasonRequired": "Enter a reason based on the published criteria.", "testing.simulation": "Simulation · no real SKR",
     "ops.policyHidden": "Hidden · policy rule", "ops.period": "Created", "ops.allDates": "All dates", "ops.utcToday": "Today · UTC", "ops.goReview": "Open work review", "ops.discard": "Discard unsaved follow-up changes?",
     "nav.projects": "Project workbench",
     "ops.total": "All projects",
@@ -103,7 +104,7 @@ const I18N = {
     "metric.blockedUsers": "Blocked identities", "metric.moderation24h": "Blocked in 24h",
     "works.search": "Search name, creator, or category", "works.status": "Work status", "works.review": "WORK REVIEW",
     "works.introduction": "Introduction", "works.features": "Features", "works.openDemo": "Open demo video",
-    "works.imageAlt": "Work image", "content.type": "Content type", "content.needs": "Needs",
+    "works.imageAlt": "Work image", "content.type": "Content type", "content.needs": "Questions & feedback",
     "content.comments": "Comments", "content.works": "Works", "content.search": "Search content or .skr",
     "content.needCount": "{count} need", "content.commentCount": "{count} comments", "content.likeCount": "{count} likes",
     "reports.search": "Search report, target, or reporter", "reports.status": "Report status",
@@ -135,6 +136,7 @@ const I18N = {
     "table.actor": "Actor", "table.action": "Action", "table.target": "Target", "error.request": "Request failed. Try again.",
   },
   zh: {
+    "nav.testing": "测试争议复核", "testing.criteria": "公开验收标准", "testing.report": "测试成果", "testing.appeal": "测试者申诉", "testing.rejection": "发起者理由", "testing.overdue": "验收超时", "testing.disputed": "存在争议", "testing.approve": "通过成果", "testing.reject": "拒绝成果", "testing.resolve": "处理测试争议", "testing.resolveMessage": "依据公开标准结案。通过后保留奖励待结算；拒绝后释放该名额与对应额度。", "testing.reasonRequired": "请填写依据公开标准作出的结案理由。", "testing.simulation": "模拟活动 · 无真实 SKR",
     "ops.policyHidden": "已屏蔽 · 规则命中", "ops.period": "新增时间", "ops.allDates": "全部时间", "ops.utcToday": "今日 · UTC", "ops.goReview": "打开作品审核", "ops.discard": "放弃尚未保存的跟进修改吗？",
     "nav.projects": "项目工作台",
     "ops.total": "项目总量",
@@ -227,7 +229,7 @@ const I18N = {
     "metric.blockedUsers": "封禁用户", "metric.moderation24h": "24 小时拦截",
     "works.search": "搜索作品名、开发者或分类", "works.status": "作品状态", "works.review": "作品审核",
     "works.introduction": "一句话介绍", "works.features": "详细功能", "works.openDemo": "打开演示视频",
-    "works.imageAlt": "作品图片", "content.type": "内容类型", "content.needs": "需求",
+    "works.imageAlt": "作品图片", "content.type": "内容类型", "content.needs": "问题与反馈",
     "content.comments": "评论", "content.works": "作品", "content.search": "搜索内容或 .skr 域名",
     "content.needCount": "{count} 个需要", "content.commentCount": "{count} 条评论", "content.likeCount": "{count} 个赞",
     "reports.search": "搜索举报、目标或举报人", "reports.status": "举报状态",
@@ -374,7 +376,7 @@ function openView(view) {
 }
 
 async function loadView(view) {
-  const loaders={overview:loadOverview,projects:loadProjects,works:loadWorks,content:loadContent,reports:loadReports,people:loadPeople,promotions:loadPromotions,system:loadSystem};
+  const loaders={overview:loadOverview,projects:loadProjects,works:loadWorks,content:loadContent,reports:loadReports,testing:loadTesting,people:loadPeople,promotions:loadPromotions,system:loadSystem};
   const result=await loaders[view]();
   byId('auth-required').classList.add('hidden');
   return result;
@@ -489,7 +491,7 @@ async function openProject(type,id) {
   const item=await request(`/admin/operations/projects/${type}/${encodeURIComponent(id)}`);
   activeProject=item;
   byId('project-title').textContent=item.title;
-  byId('project-meta').textContent=`${opsLabel('submittedBy')} ${item.author_skr} · ${dateTime(item.created_at)}`;
+  byId('project-meta').textContent=`${opsLabel('submittedBy')} ${item.author_skr} · ${dateTime(item.created_at)} · ${communityMeta(item)}`;
   byId('project-summary').textContent=item.summary;
   byId('project-facts').innerHTML=`${stageBadge(item.stage)}${item.policy_violation?`<span class="badge rejected">${opsLabel('policyHidden')}</span>`:''} <span>${opsLabel('wait')}: ${item.stage==='done'?'—':escapeHtml(relativeWait(item.stage_since))}</span> <span>${num(item.reactions)} ${opsLabel('reactions')} · ${num(item.comment_count)} ${t('metric.comments')}</span>${item.budget_skr?`<span>${opsLabel('budget')}: ${num(item.budget_skr)} SKR</span>`:''}`;
   byId('project-assignee').value=item.assignee;byId('project-stage').value=item.stage;byId('project-note').value=item.note;
@@ -554,6 +556,13 @@ function bindWorkActions() {
   bindRemoveActions();
 }
 
+function communityMeta(item) {
+  const zh=store.language==='zh';
+  const statuses={open:zh?'待回应':'Open',needs_info:zh?'待补充信息':'More detail needed',suggested:zh?'已有建议':'Suggestion received',testing:zh?'招募测试':'Seeking testers',resolved:zh?'作者确认已解决':'Author confirmed solved',unresolved:zh?'仍未解决':'Still unresolved'};
+  const feedback={issue:zh?'遇到问题':'Issue',suggestion:zh?'改进建议':'Suggestion',praise:zh?'值得表扬':'Praise'};
+  return [item.app_name||item.store_package,feedback[item.feedback_type],statuses[item.status||item.public_status]].filter(Boolean).join(' · ');
+}
+
 async function loadContent() {
   const [needs, comments, works] = await run(() => Promise.all([request("/admin/needs"), request("/admin/comments"), request("/admin/works")]));
   store.needs = needs.items; store.comments = comments.items; store.works = works.items;
@@ -564,7 +573,7 @@ function renderContent() {
   const query = lower(byId("content-search").value);
   let items;
   if (store.contentType === "needs") {
-    items = store.needs.filter((item) => lower(`${item.title} ${item.problem} ${item.author_skr} ${item.category}`).includes(query)).map((item) => ({ id: item.id, type: "needs", title: item.title, author: item.author_skr, meta: `${item.category} · ${t("content.needCount", { count: item.need_count })} · ${t("content.commentCount", { count: item.comment_count })}`, body: item.problem, created: item.created_at }));
+    items = store.needs.filter((item) => lower(`${item.title} ${item.problem} ${item.author_skr} ${item.category} ${item.app_name||''} ${item.store_package||''}`).includes(query)).map((item) => ({ id: item.id, type: "needs", title: item.title, author: item.author_skr, meta: `${communityMeta(item)} · ${t("content.needCount", { count: item.need_count })} · ${t("content.commentCount", { count: item.comment_count })}`, body: item.problem, created: item.created_at }));
   } else if (store.contentType === "comments") {
     items = store.comments.filter((item) => lower(`${item.body} ${item.author_skr}`).includes(query)).map((item) => ({ id: item.id, type: "comments", title: item.body.slice(0, 90), author: item.author_skr, meta: `${item.target_type} · ${t("content.likeCount", { count: item.like_count })}`, body: item.body, created: item.created_at }));
   } else {
@@ -617,6 +626,22 @@ function renderReports() {
     };
   });
   bindRemoveActions();
+}
+
+async function loadTesting() {
+  const data = await run(() => request('/admin/testing-reviews'));
+  byId('testing-count').textContent = t('count.records', {count:data.items.length});
+  byId('testing-list').innerHTML = data.items.length ? data.items.map(item => `<article class="record"><div class="record-main"><h2 class="record-title">${escapeHtml(item.title)}</h2><p class="record-meta">${escapeHtml(item.app_name)} · ${escapeHtml(item.app_version)} · ${escapeHtml(item.tester_skr)} · ${escapeHtml(t(item.status==='disputed'?'testing.disputed':'testing.overdue'))}</p>${item.funding_state==='simulated'?`<p class="record-meta">${t('testing.simulation')}</p>`:''}<h3>${t('testing.criteria')}</h3><p class="record-copy">${escapeHtml(item.requirements)}</p><h3>${t('testing.report')}</h3><p class="record-copy">${escapeHtml(item.body)}</p>${safeExternalUrl(item.evidence_url)?`<a href="${escapeHtml(safeExternalUrl(item.evidence_url))}" target="_blank" rel="noopener noreferrer">${t('action.open')}</a>`:''}${item.review_reason?`<h3>${t('testing.rejection')}</h3><p class="record-copy">${escapeHtml(item.review_reason)}</p>`:''}${item.appeal_reason?`<h3>${t('testing.appeal')}</h3><p class="record-copy">${escapeHtml(item.appeal_reason)}</p>`:''}</div><div class="record-actions"><button class="primary" data-testing="${escapeHtml(item.id)}" data-approve="true">${t('testing.approve')}</button><button class="danger" data-testing="${escapeHtml(item.id)}" data-approve="false">${t('testing.reject')}</button></div></article>`).join('') : emptyMarkup();
+  document.querySelectorAll('[data-testing]').forEach(button => {
+    button.onclick = () => {
+      const item = data.items.find(item => item.id === button.dataset.testing);
+      askConfirm({title:t('testing.resolve'),message:t('testing.resolveMessage'),label:button.textContent,note:true,danger:button.dataset.approve==='false',action:async reason => {
+        if(!reason) throw new Error(t('testing.reasonRequired'));
+        await request(`/admin/testing-entries/${encodeURIComponent(item.id)}/resolve`,{method:'POST',body:JSON.stringify({revision:item.revision,approve:button.dataset.approve==='true',reason})});
+        await loadTesting();
+      }});
+    };
+  });
 }
 
 async function loadPeople() {

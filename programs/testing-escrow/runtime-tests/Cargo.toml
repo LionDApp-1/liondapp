@@ -1,0 +1,20 @@
+[package]
+name = "liondapp-escrow-runtime-tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+liondapp-testing-escrow = { path = "..", features = ["no-entrypoint"] }
+anchor-lang = "=0.32.1"
+anchor-spl = "=0.32.1"
+litesvm = "=0.7.1"
+solana-account = "2.2"
+# Anchor 0.32.1 uses AccountInfo::resize, introduced in 2.3.
+solana-account-info = "=2.3.0"
+solana-keypair = "=2.2.3"
+solana-signer = "2.2"
+solana-transaction = "2.2"
+solana-transaction-error = "2.2"
+solana-instruction = "2.3"
+bincode = "1.3"

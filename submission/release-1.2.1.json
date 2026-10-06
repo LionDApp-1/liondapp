@@ -1,0 +1,14 @@
+{
+  "version": "1.2.1",
+  "versionCode": 4,
+  "package": "top.oneion.liondapp",
+  "apk": "LionDApp-release.apk",
+  "sha256": "f5781a084fbc55d6b28682afd6500048664ee5ec58ed71a0561e93e790892cf3",
+  "signerCertificateSha256": "f65056df09f0d5d6a156c8a57b8803f153d3ce13dcff627da7fda0b80b9e0e7e",
+  "storeStatus": "In Review",
+  "submittedDate": "2026-10-06",
+  "releaseMint": "Gaf9kG82mZf2bnkKribvJx1MJXJdaxTWJKJBouzcCU1w",
+  "collection": "DsYS7b323xsa3eMH9JwGjo1nS7nCs7RvaRKptW9tmxX2",
+  "finalizedTransaction": "3qLZ42KprTzhqZwjvhGhwX9XsriTXsu5Pv2WBHUXPVadDxmkqdKubGv5zPAh8AkshJzzFP78DG6uGswkkvwkkc6B",
+  "realSkrFundingEnabled": false
+}

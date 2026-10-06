@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
@@ -41,8 +42,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Subject
+import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.Timeline
+import androidx.compose.material.icons.outlined.MailOutline
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
@@ -57,10 +66,12 @@ import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.NotificationsNone
+import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.PersonOutline
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.Flag
+import androidx.compose.material.icons.outlined.Forum
 import androidx.compose.material.icons.outlined.RocketLaunch
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Storefront
@@ -68,6 +79,7 @@ import androidx.compose.material.icons.outlined.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -132,6 +144,7 @@ import top.oneion.liondapp.WorkSubmissionState
 import top.oneion.liondapp.R
 import top.oneion.liondapp.model.CreateNeedRequest
 import top.oneion.liondapp.model.CreateWorkRequest
+import top.oneion.liondapp.model.CommentItem
 import top.oneion.liondapp.model.NeedItem
 import top.oneion.liondapp.model.WorkItem
 import top.oneion.liondapp.model.StoreAppItem
@@ -139,10 +152,11 @@ import top.oneion.liondapp.ui.theme.LionGold
 import top.oneion.liondapp.ui.theme.LionGreen
 import top.oneion.liondapp.ui.theme.LionCoral
 
-private enum class MainTab { Needs, Works, Profile }
+private enum class MainTab { Discover, Campaigns, Needs, Profile }
 private enum class NeedComposerMode { Structured, Wild }
 internal val LocalAppLanguage = compositionLocalOf { "en" }
-private data class DetailTarget(
+@kotlinx.serialization.Serializable
+internal data class DetailTarget(
     val kind: String,
     val id: String,
     val title: String,
@@ -159,16 +173,21 @@ private data class DetailTarget(
     val promotedUntil: String? = null,
     val originalBody: String? = null,
     val originalSummary: String? = null,
+    val need: NeedItem? = null,
+    val storePackage: String? = null,
+    val work: WorkItem? = null,
+    val storeApp: StoreAppItem? = null,
 )
 
-private fun mediaUrl(key: String): String = BuildConfig.API_BASE_URL + "/media/" + key.split("/").joinToString("/") { Uri.encode(it) }
+internal fun mediaUrl(key: String): String = BuildConfig.API_BASE_URL + "/media/" + key.split("/").joinToString("/") { Uri.encode(it) }
 
-private fun WorkItem.toDetailTarget() = DetailTarget(
+internal fun WorkItem.toDetailTarget() = DetailTarget(
     "work", id, name, description, authorSkr, summary = summary,
     media = screenshots, moderationStatus = moderationStatus, promotedUntil = promotedUntil,
+    url = storeUrl.takeIf { it.startsWith("https://") || it.startsWith("solanadappstore://details?") }, storePackage = storePackage, work = this,
 )
 
-private fun StoreAppItem.toDetailTarget(language: String) = DetailTarget(
+internal fun StoreAppItem.toDetailTarget(language: String) = DetailTarget(
     "store",
     androidPackage,
     displayName,
@@ -178,7 +197,13 @@ private fun StoreAppItem.toDetailTarget(language: String) = DetailTarget(
     summary = if (language == "zh") subtitleZh?.takeIf(String::isNotBlank) ?: subtitle else subtitle,
     originalBody = if (language == "zh" && !descriptionZh.isNullOrBlank()) description else null,
     originalSummary = subtitle,
+    storePackage = androidPackage,
+    storeApp = this,
 )
+
+internal fun NeedItem.toDetailTarget() = DetailTarget("need", id, title, problem, authorSkr,
+    summary = solutionIdea.takeIf(String::isNotBlank), audience = audience.takeIf(String::isNotBlank),
+    media = media, needFormat = format, requestType = requestType, budgetSkr = budgetSkr, need = this, storePackage = storePackage)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -190,17 +215,27 @@ fun LionDApp(
     onLanguageChange: (String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    var tab by rememberSaveable { mutableStateOf(MainTab.Needs) }
+    var tab by rememberSaveable { mutableStateOf(MainTab.Discover) }
     var query by rememberSaveable { mutableStateOf("") }
     val keyboard = LocalSoftwareKeyboardController.current
     var showNeedComposer by rememberSaveable { mutableStateOf(false) }
     var showWorkComposer by rememberSaveable { mutableStateOf(false) }
-    var detail by remember { mutableStateOf<DetailTarget?>(null) }
+    var showPublishMenu by remember { mutableStateOf(false) }
+    var showSignIn by rememberSaveable { mutableStateOf(false) }
+    var showCampaignComposer by rememberSaveable { mutableStateOf(false) }
+    var campaignId by rememberSaveable { mutableStateOf<String?>(null) }
+    var editingNeed by rememberSaveable(stateSaver = jsonStateSaver<NeedItem?>()) { mutableStateOf<NeedItem?>(null) }
+    var feedbackApp by rememberSaveable(stateSaver = jsonStateSaver<StoreAppItem?>()) { mutableStateOf<StoreAppItem?>(null) }
+    var composerFeedback by rememberSaveable { mutableStateOf(false) }
+    var detail by rememberSaveable(stateSaver = jsonStateSaver<DetailTarget?>()) { mutableStateOf<DetailTarget?>(null) }
     var detailAboveChat by remember { mutableStateOf(false) }
     LaunchedEffect(state.activeChat?.id) { if (state.activeChat != null) { detail = null; detailAboveChat = false } }
     var showInbox by rememberSaveable { mutableStateOf(false) }
     var showLanguageMenu by remember { mutableStateOf(false) }
     val snackbars = remember { SnackbarHostState() }
+    LaunchedEffect(state.skrDomain) { if (state.skrDomain != null) showSignIn = false }
+    val openDetail: (DetailTarget) -> Unit = { if(it.kind=="campaign") {detail=null;campaignId=it.id} else detail=it }
+    val startFeedback: (StoreAppItem) -> Unit = { app -> feedbackApp = app; editingNeed = null; composerFeedback = true; showNeedComposer = true }
 
     val errorMessage = state.error?.let { userFacingError(it) }
     LaunchedEffect(errorMessage) { errorMessage?.let { snackbars.showSnackbar(it) } }
@@ -239,17 +274,20 @@ fun LionDApp(
                             }
                         }
                         IconButton(onClick = { viewModel.refresh(); viewModel.loadMe() }) { Icon(Icons.Outlined.Refresh, stringResource(R.string.retry)) }
-                        if (tab != MainTab.Profile) IconButton(onClick = {
-                if (state.skrDomain == null) tab = MainTab.Profile else if (tab == MainTab.Needs) showNeedComposer = true else {
-                    viewModel.resetWorkSubmission()
-                    showWorkComposer = true
-                }
-            }, modifier = Modifier.padding(end = 12.dp).size(44.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape)) { Icon(Icons.Outlined.Add, if (tab == MainTab.Needs) stringResource(R.string.publish_need) else stringResource(R.string.publish_work), tint = MaterialTheme.colorScheme.onPrimaryContainer) }
+                        Box {
+                            if (tab != MainTab.Profile) IconButton(onClick = { showPublishMenu = true }, modifier = Modifier.padding(end = 12.dp).size(44.dp)) { Icon(Icons.Outlined.Add, uiText("Publish", "发布")) }
+                            DropdownMenu(showPublishMenu, { showPublishMenu = false }) {
+                                DropdownMenuItem(text = { Text(uiText("Invite dApp testers", "发起测试活动")) }, onClick = { showPublishMenu = false; viewModel.loadCampaigns(); showCampaignComposer = true })
+                                DropdownMenuItem(text = { Text(uiText("Ask the community", "提出问题")) }, onClick = { showPublishMenu = false; editingNeed = null; feedbackApp = null; composerFeedback = false; showNeedComposer = true })
+                                DropdownMenuItem(text = { Text(uiText("Share dApp feedback", "评价 dApp")) }, onClick = { showPublishMenu = false; editingNeed = null; feedbackApp = null; composerFeedback = true; showNeedComposer = true })
+                                DropdownMenuItem(text = { Text(uiText("Submit an app", "提交作品")) }, onClick = { showPublishMenu = false; if (state.skrDomain == null) showSignIn = true else { viewModel.resetWorkSubmission(); showWorkComposer = true } })
+                            }
+                        }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                     windowInsets = WindowInsets(0, 0, 0, 0),
                 )
-                if (tab != MainTab.Profile) {
+                if (tab != MainTab.Profile && tab != MainTab.Campaigns) {
                     OutlinedTextField(
                         value = query,
                         onValueChange = { query = it },
@@ -278,35 +316,50 @@ fun LionDApp(
         },
         bottomBar = {
             NavigationBar(containerColor = MaterialTheme.colorScheme.background, tonalElevation = 0.dp) {
-                NavigationBarItem(tab == MainTab.Needs, { tab = MainTab.Needs }, { Icon(Icons.Outlined.Lightbulb, null) }, label = { Text(stringResource(R.string.needs)) }, colors = storeNavigationColors())
-                NavigationBarItem(tab == MainTab.Works, { tab = MainTab.Works }, { Icon(Icons.Outlined.Storefront, null) }, label = { Text(stringResource(R.string.works)) }, colors = storeNavigationColors())
+                NavigationBarItem(tab == MainTab.Discover, { tab = MainTab.Discover }, { Icon(Icons.Outlined.Storefront, null) }, label = { Text(uiText("Discover", "发现")) }, colors = storeNavigationColors())
+                NavigationBarItem(tab == MainTab.Campaigns, { tab = MainTab.Campaigns }, { Icon(Icons.Outlined.Science, null) }, label = { Text(uiText("Testing", "测试活动")) }, colors = storeNavigationColors())
+                NavigationBarItem(tab == MainTab.Needs, { tab = MainTab.Needs }, { Icon(Icons.Outlined.Lightbulb, null) }, label = { Text(uiText("Questions", "问题与反馈")) }, colors = storeNavigationColors())
                 NavigationBarItem(tab == MainTab.Profile, { tab = MainTab.Profile }, { Icon(Icons.Outlined.PersonOutline, null) }, label = { Text(stringResource(R.string.profile)) }, colors = storeNavigationColors())
             }
         },
     ) { padding ->
         when {
+            tab == MainTab.Campaigns -> CampaignsScreen(state, Modifier.padding(padding), viewModel, {showSignIn=true}, {viewModel.loadCampaigns();showCampaignComposer=true}, {campaignId=it})
             state.loading && state.needs.isEmpty() && state.works.isEmpty() -> Loading(Modifier.padding(padding))
-            tab == MainTab.Needs -> NeedsScreen(state, Modifier.padding(padding), viewModel, { tab = MainTab.Profile }, { detail = it })
-            tab == MainTab.Works -> WorksScreen(state, Modifier.padding(padding), viewModel, { tab = MainTab.Profile }, { detail = it })
-            else -> ProfileScreen(state, Modifier.padding(padding), activity, walletActivityResultSender, viewModel, language)
+            tab == MainTab.Needs || (state.searchActive && tab != MainTab.Profile) -> NeedsScreen(state, Modifier.padding(padding), viewModel, { showSignIn = true }, openDetail)
+            tab == MainTab.Discover -> DiscoverScreen(state, Modifier.padding(padding), viewModel, { showSignIn = true }, openDetail)
+            else -> ProfileScreen(state, Modifier.padding(padding), activity, walletActivityResultSender, viewModel, language, {campaignId=it}, openDetail)
         }
     }
 
-    if (showNeedComposer) NeedComposer(state.config?.categories.orEmpty(), state.publishingNeed, state.error, { showNeedComposer = false }) { request ->
-        viewModel.publishNeed(request) { if (it) { showNeedComposer = false; viewModel.refresh() } }
+    if (showCampaignComposer) CampaignComposer(state,viewModel,{showCampaignComposer=false},{showSignIn=true})
+    campaignId?.let { id -> CampaignDetail(id,state,viewModel,{campaignId=null},{showSignIn=true}) { postId -> campaignId=null; viewModel.loadNeed(postId) {detail=it.toDetailTarget()} } }
+
+    if (showNeedComposer) key(editingNeed?.id, composerFeedback, feedbackApp?.androidPackage) {
+        CommunityComposer(state, viewModel, editingNeed, feedbackApp, composerFeedback, { showNeedComposer = false }, { showSignIn = true }) { request ->
+            viewModel.publishNeed(request, { if (it) { showNeedComposer = false; detail = null; viewModel.refresh() } }, editingNeed?.id)
+        }
     }
-    if (showWorkComposer) WorkComposer(state.config?.categories.orEmpty(), state.workSubmission, { showWorkComposer = false }) { request, media ->
+    if (showWorkComposer) WorkComposer(state.config?.categories.orEmpty(), state.workSubmission, { showWorkComposer = false }, state, viewModel) { request, media ->
         viewModel.publishWork(request, media) { if (it) { viewModel.refresh(); viewModel.loadMe() } }
     }
     detail?.takeUnless { detailAboveChat }?.let { target ->
-        DetailDialog(target, state, onClose = { detail = null }, onRequireSignIn = { detail = null; tab = MainTab.Profile }, viewModel = viewModel, activity = activity)
+        DetailDialog(target, state, onClose = { detail = null }, onRequireSignIn = { showSignIn = true }, viewModel = viewModel, activity = activity, open = openDetail, feedback = startFeedback, edit = { editingNeed = it; feedbackApp = null; composerFeedback = it.kind == "feedback"; showNeedComposer = true })
     }
     if (showInbox && state.skrDomain != null) InboxDialog(state, viewModel) { showInbox = false }
     state.activeChat?.let { chat -> key(chat.id) { ChatDialog(state, viewModel) } }
     detail?.takeIf { detailAboveChat }?.let { target ->
-        DetailDialog(target, state, onClose = { detail = null; detailAboveChat = false }, onRequireSignIn = { detail = null; detailAboveChat = false; tab = MainTab.Profile }, viewModel = viewModel, activity = activity)
+        DetailDialog(target, state, onClose = { detail = null; detailAboveChat = false }, onRequireSignIn = { showSignIn = true }, viewModel = viewModel, activity = activity, open = openDetail, feedback = startFeedback, edit = { editingNeed = it; composerFeedback = it.kind == "feedback"; showNeedComposer = true })
     }
     state.profilePreview?.let { profile -> PublicProfileDialog(profile.skrDomain, state, { viewModel.clearProfile() }, { viewModel.clearProfile(); tab = MainTab.Profile }, viewModel) { viewModel.clearProfile(); detailAboveChat = state.activeChat != null; detail = it } }
+    if (showSignIn && state.skrDomain == null) Dialog(onDismissRequest = { showSignIn = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxSize()) {
+            Column(Modifier.statusBarsPadding()) {
+                IconButton({ showSignIn = false }) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText("Back", "返回")) }
+                ProfileScreen(state, Modifier.weight(1f), activity, walletActivityResultSender, viewModel, language, {campaignId=it}, openDetail)
+            }
+        }
+    }
 }
 
 @Composable
@@ -316,22 +369,24 @@ private fun Loading(modifier: Modifier = Modifier) = Box(modifier.fillMaxSize(),
 private fun NeedsScreen(state: LionUiState, modifier: Modifier, viewModel: LionViewModel, onRequireSignIn: () -> Unit, open: (DetailTarget) -> Unit) {
     var sort by rememberSaveable { mutableStateOf("latest") }
     var category by rememberSaveable { mutableStateOf<String?>(null) }
+    var kind by rememberSaveable { mutableStateOf<String?>(null) }
+    var status by rememberSaveable { mutableStateOf<String?>(null) }
+    var paid by rememberSaveable { mutableStateOf(false) }
     val language = LocalAppLanguage.current
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp, 12.dp, 20.dp, 100.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item { FeedHeading(if (state.searchActive) uiText("Search results", "搜索结果") else uiText("Questions & feedback", "问题与反馈"), state.needs.size) }
         if (!state.searchActive) item {
-            DiscoveryBanner(uiText("THE SEEKER COMMUNITY", "SEEKER 社区"), uiText("Great apps start\nwith your ideas.", "好应用，从你的\n一个想法开始。"), uiText("Discover a need. Inspire the next dApp.", "发现真实需求，让下一个 dApp 在这里诞生。"))
+            CommunityFilters(kind, status, paid) { nextKind, nextStatus, nextPaid -> kind = nextKind; status = nextStatus; paid = nextPaid; viewModel.refresh(needSort = sort, needCategory = category, needKind = kind, needStatus = status, paid = paid) }
         }
-        item { Text(uiText("Paid development first · budgets are self-reported", "付费开发优先 · 预算由需求方自行填写"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        item { FeedHeading(if (state.searchActive) uiText("Search results", "搜索结果") else uiText("Community needs", "社区需求"), state.needs.size) }
         item {
             SortRow(listOf("latest" to stringResource(R.string.latest), "needed" to stringResource(R.string.most_needed), "discussed" to stringResource(R.string.most_discussed)), sort) {
-                sort = it; viewModel.refresh(needSort = it, needCategory = category)
+                sort = it; viewModel.refresh(needSort = it, needCategory = category, needKind = kind, needStatus = status, paid = paid)
             }
         }
-        item { CategoryFilterRow(state.config?.categories.orEmpty(), category) { category = it; viewModel.refresh(needSort = sort, needCategory = it) } }
+        item { CategoryFilterRow(state.config?.categories.orEmpty(), category) { category = it; viewModel.refresh(needSort = sort, needCategory = it, needKind = kind, needStatus = status, paid = paid) } }
         if (state.needs.isEmpty()) item { EmptyState(Icons.Outlined.Lightbulb, stringResource(R.string.empty_needs)) }
         items(state.needs, key = { it.id }) { need -> NeedCard(need, { if (state.skrDomain == null) onRequireSignIn() else viewModel.toggleNeed(need.id) }, author = { viewModel.loadProfile(need.authorSkr) }) {
-            open(DetailTarget("need", need.id, need.title, need.problem, need.authorSkr, summary = need.solutionIdea.takeIf(String::isNotBlank), audience = need.audience, media = need.media, needFormat = need.format, requestType = need.requestType, budgetSkr = need.budgetSkr))
+            open(need.toDetailTarget())
         } }
         if (state.searchActive && state.works.isNotEmpty()) {
             item { SectionTitle(uiText("Matching works", "匹配作品"), Modifier.padding(top = 14.dp)) }
@@ -391,7 +446,7 @@ private fun storeNavigationColors() = NavigationBarItemDefaults.colors(
 )
 
 @Composable
-private fun DiscoveryBanner(eyebrow: String, title: String, subtitle: String) {
+internal fun DiscoveryBanner(eyebrow: String, title: String, subtitle: String) {
     Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(Brush.linearGradient(listOf(Color(0xFF214E41), Color(0xFF162B27), Color(0xFF192723))))) {
         Canvas(Modifier.matchParentSize()) {
             val center = Offset(size.width * .94f, size.height * .38f)
@@ -404,6 +459,20 @@ private fun DiscoveryBanner(eyebrow: String, title: String, subtitle: String) {
             Text(eyebrow, style = MaterialTheme.typography.labelSmall, letterSpacing = 1.6.sp, color = Color(0xFFB7F5D1), fontWeight = FontWeight.Bold)
             Text(title, style = MaterialTheme.typography.headlineLarge, color = Color.White, fontWeight = FontWeight.Bold)
             Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = Color(0xFFB4CEC3))
+        }
+    }
+}
+
+@Composable
+internal fun DiscoverMetric(icon: androidx.compose.ui.graphics.vector.ImageVector, value: String, label: String, modifier: Modifier = Modifier) {
+    Surface(modifier, shape = RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, Modifier.size(19.dp), tint = MaterialTheme.colorScheme.secondary)
+            Spacer(Modifier.width(9.dp))
+            Column {
+                Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
@@ -442,31 +511,40 @@ private fun CategoryFilterRow(categories: List<String>, selected: String?, modif
 }
 
 @Composable
-private fun NeedCard(item: NeedItem, react: () -> Unit, author: () -> Unit = {}, open: () -> Unit) {
+internal fun NeedCard(item: NeedItem, react: () -> Unit, author: () -> Unit = {}, open: () -> Unit) {
     val isWild = item.format == "wild"
     Card(onClick = open, shape = RoundedCornerShape(24.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.fillMaxWidth().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(shape = CircleShape, color = if (isWild) Color(0xFF393349) else MaterialTheme.colorScheme.surfaceVariant) {
-                    Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(if (isWild) Icons.Outlined.AutoAwesome else Icons.Outlined.Lightbulb, null, Modifier.size(14.dp), tint = if (isWild) Color(0xFFD6C4F5) else MaterialTheme.colorScheme.primaryContainer)
-                        Spacer(Modifier.width(6.dp))
-                        Text(if (isWild) uiText("Wild Ideas", "天马行空") else categoryLabel(item.category), style = MaterialTheme.typography.labelSmall)
+                if (item.kind == "feedback") {
+                    AsyncImage(model = item.appIcon, contentDescription = item.appName, modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentScale = ContentScale.Crop)
+                    Spacer(Modifier.width(10.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(item.appName ?: item.storePackage.orEmpty(), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        Text(feedbackLabel(item.feedbackType), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                    }
+                } else {
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
+                        Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(if (isWild) Icons.Outlined.AutoAwesome else Icons.Outlined.Lightbulb, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.secondary)
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (isWild) uiText("Wild Ideas", "天马行空") else categoryLabel(item.category), style = MaterialTheme.typography.labelSmall)
+                        }
                     }
                 }
                 Spacer(Modifier.weight(1f))
                 Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             }
-            RequestBadge(item.requestType, item.budgetSkr)
             Text(item.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(item.problem, style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            NeedMeta(item, showApp = false)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(item.authorSkr, Modifier.weight(1f).clickable(onClick = author), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Stat(Icons.Outlined.ChatBubbleOutline, item.commentCount)
                 Spacer(Modifier.width(12.dp))
                 Surface(onClick = react, shape = CircleShape, color = MaterialTheme.colorScheme.surfaceVariant) {
                     Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Outlined.Lightbulb, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primaryContainer)
+                        Icon(Icons.Outlined.Lightbulb, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary)
                         Spacer(Modifier.width(6.dp)); Text(item.needCount.toString(), style = MaterialTheme.typography.labelLarge)
                     }
                 }
@@ -476,7 +554,7 @@ private fun NeedCard(item: NeedItem, react: () -> Unit, author: () -> Unit = {},
 }
 
 @Composable
-private fun WorkCard(item: WorkItem, react: () -> Unit, author: () -> Unit = {}, open: () -> Unit) {
+internal fun WorkCard(item: WorkItem, react: () -> Unit, author: () -> Unit = {}, open: () -> Unit) {
     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).clickable(onClick = open).padding(vertical = 16.dp, horizontal = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             AsyncImage(model = mediaUrl(item.iconKey), contentDescription = item.name, modifier = Modifier.size(76.dp).clip(RoundedCornerShape(22.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentScale = ContentScale.Crop)
@@ -501,7 +579,7 @@ private fun WorkCard(item: WorkItem, react: () -> Unit, author: () -> Unit = {},
 }
 
 @Composable
-private fun StoreAppCard(item: StoreAppItem, open: () -> Unit) {
+internal fun StoreAppCard(item: StoreAppItem, open: () -> Unit) {
     val language = LocalAppLanguage.current
     val subtitle = if (language == "zh") item.subtitleZh?.takeIf(String::isNotBlank) ?: item.subtitle else item.subtitle
     val description = if (language == "zh") item.descriptionZh?.takeIf(String::isNotBlank) ?: item.description else item.description
@@ -509,7 +587,10 @@ private fun StoreAppCard(item: StoreAppItem, open: () -> Unit) {
     Card(onClick = open, shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                AsyncImage(model = item.iconUrl, contentDescription = item.displayName, modifier = Modifier.size(72.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentScale = ContentScale.Crop)
+                Box(Modifier.size(72.dp).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentAlignment = Alignment.Center) {
+                    Icon(Icons.Outlined.Apps, null, Modifier.size(32.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    AsyncImage(model = item.iconUrl, contentDescription = item.displayName, modifier = Modifier.matchParentSize(), contentScale = ContentScale.Crop)
+                }
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Text(item.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -553,13 +634,15 @@ private fun PromotedWorkCard(item: WorkItem, open: () -> Unit) {
 }
 
 @Composable
-private fun ProfileScreen(
+internal fun ProfileScreen(
     state: LionUiState,
     modifier: Modifier,
     activity: ComponentActivity,
     walletActivityResultSender: ActivityResultSender,
     viewModel: LionViewModel,
     language: String,
+    openCampaign: (String) -> Unit,
+    open: (DetailTarget) -> Unit,
 ) {
     var age by rememberSaveable { mutableStateOf(false) }
     var terms by rememberSaveable { mutableStateOf(false) }
@@ -572,9 +655,10 @@ private fun ProfileScreen(
             Icon(painterResource(R.drawable.ic_liondapp), null, Modifier.size(72.dp), tint = Color.Unspecified)
             Text(uiText("Join LionDApp", "加入 LionDApp"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(stringResource(R.string.browse_first), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            FormSectionHeading(uiText("Before you connect", "连接前确认"))
             ConsentRow(age, { age = it }, uiText("I confirm that I am at least 18 years old", "我确认已年满 18 周岁"))
             ConsentRow(terms, { terms = it }, uiText("I accept the Terms, Privacy Policy and Community Rules", "我接受服务条款、隐私政策和社区规则"))
-            Column {
+            ProfileGroup(uiText("Legal", "条款与隐私")) {
                 TextButton({ activity.startActivity(Intent(Intent.ACTION_VIEW, "https://liondapp.1ion.top/terms".toUri())) }) { Text(uiText("Terms of Service", "服务条款")) }
                 TextButton({ activity.startActivity(Intent(Intent.ACTION_VIEW, "https://liondapp.1ion.top/privacy".toUri())) }) { Text(uiText("Privacy Policy", "隐私政策")) }
                 TextButton({ activity.startActivity(Intent(Intent.ACTION_VIEW, "https://liondapp.1ion.top/community".toUri())) }) { Text(uiText("Community Rules", "社区规则")) }
@@ -584,21 +668,31 @@ private fun ProfileScreen(
                 Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.connect_wallet))
             }
         } else {
-            Box(Modifier.size(72.dp).background(MaterialTheme.colorScheme.tertiaryContainer, CircleShape), contentAlignment = Alignment.Center) { Text(state.skrDomain.take(1).uppercase(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold) }
-            Text(state.skrDomain, Modifier.clickable { viewModel.loadProfile(state.skrDomain) }, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Row(verticalAlignment = Alignment.CenterVertically) { Icon(Icons.Outlined.CheckCircle, null, tint = LionGreen); Spacer(Modifier.width(8.dp)); Text(uiText("Verified Seeker identity", "已验证 Seeker 身份")) }
-            HorizontalDivider()
-            ProfileLink(Icons.Outlined.NotificationsNone, "${stringResource(R.string.notifications)} (${state.notifications.size})") { showNotifications = true }
-            ProfileLink(Icons.AutoMirrored.Outlined.OpenInNew, stringResource(R.string.support)) { activity.startActivity(Intent(Intent.ACTION_VIEW, "https://liondapp.1ion.top/support".toUri())) }
-            ProfileLink(Icons.Outlined.FavoriteBorder, uiText("Support LionDApp", "支持 LionDApp · 自愿打赏")) { showDonation = true }
-            ProfileLink(Icons.Outlined.PersonOutline, uiText("Edit profile", "编辑资料")) { editProfile = true }
-            if (state.myNeeds.isNotEmpty()) {
-                SectionTitle(uiText("My needs", "我的需求"))
-                state.myNeeds.forEach { item -> OwnedContentRow(item.title, "${item.needCount} · ${item.commentCount}") { viewModel.deleteNeed(item.id) } }
+            Text(uiText("My profile", "个人主页"), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(64.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(18.dp)), contentAlignment = Alignment.Center) { Text(state.skrDomain.take(1).uppercase(), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer) }
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(state.skrDomain, Modifier.clickable { viewModel.loadProfile(state.skrDomain) }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) { Icon(Icons.Outlined.CheckCircle, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.secondary); Text(uiText("Verified .skr ownership", "已验证 .skr 所有权"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                }
             }
-            if (state.myWorks.isNotEmpty()) {
-                SectionTitle(uiText("My works", "我的作品"))
-                state.myWorks.forEach { item ->
+            ProfileGroup(uiText("Activity & profile", "动态与资料")) {
+                ProfileLink(Icons.Outlined.NotificationsNone, "${stringResource(R.string.notifications)} (${state.notifications.size})") { showNotifications = true }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                ProfileLink(Icons.Outlined.PersonOutline, uiText("Edit profile", "编辑资料")) { editProfile = true }
+            }
+            if (state.myNeeds.isNotEmpty()) ProfileGroup(uiText("My questions & feedback", "我的问题与反馈")) {
+                state.myNeeds.forEachIndexed { index, item -> if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant); ProfileContentLink(item.title, statusLabel(item.status)) { open(item.toDetailTarget()) } }
+            }
+            if (state.following.isNotEmpty()) ProfileGroup(uiText("Following", "我关注的")) {
+                state.following.forEachIndexed { index, item -> if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant); ProfileContentLink(item.title, statusLabel(item.status)) { open(item.toDetailTarget()) } }
+            }
+            if (state.followingApps.isNotEmpty()) ProfileGroup(uiText("Apps I follow", "我关注的应用")) {
+                state.followingApps.forEachIndexed { index, app -> if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant); ProfileContentLink(app.displayName) { open(app.toDetailTarget(language)) } }
+            }
+            if (state.myWorks.isNotEmpty()) ProfileGroup(uiText("My works", "我的作品")) {
+                state.myWorks.forEachIndexed { index, item ->
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                     val status = when {
                         item.publicVisibility == "hidden_policy" -> uiText("Hidden · Community Rules", "已屏蔽 · 违反社区规则")
                         item.moderationStatus == "published" -> uiText("Published", "已发布")
@@ -609,17 +703,25 @@ private fun ProfileScreen(
                     OwnedContentRow(item.name, status) { viewModel.deleteWork(item.id) }
                 }
             }
-            if (state.blockedUsers.isNotEmpty()) {
-                SectionTitle(uiText("Blocked users", "已屏蔽用户"))
-                state.blockedUsers.forEach { item -> BlockedUserRow(item.skrDomain) { viewModel.unblockUser(item.skrDomain) } }
+            if (state.blockedUsers.isNotEmpty()) ProfileGroup(uiText("Blocked users", "已屏蔽用户")) {
+                state.blockedUsers.forEachIndexed { index, item -> if (index > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant); BlockedUserRow(item.skrDomain) { viewModel.unblockUser(item.skrDomain) } }
             }
-            OutlinedButton(onClick = viewModel::signOut, modifier = Modifier.fillMaxWidth()) { Text(uiText("Sign out", "退出登录")) }
-            TextButton(onClick = { deleteAccount = true }, modifier = Modifier.fillMaxWidth()) { Text(uiText("Delete account", "删除账户"), color = MaterialTheme.colorScheme.error) }
+            ProfileGroup(uiText("Help & support", "帮助与支持")) {
+                ProfileLink(Icons.AutoMirrored.Outlined.OpenInNew, stringResource(R.string.support)) { activity.startActivity(Intent(Intent.ACTION_VIEW, "https://liondapp.1ion.top/support".toUri())) }
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                ProfileLink(Icons.Outlined.FavoriteBorder, uiText("Support LionDApp", "支持 LionDApp · 自愿打赏")) { showDonation = true }
+            }
+            ProfileGroup(uiText("Account", "账户")) {
+                ProfileContentLink(uiText("Sign out", "退出登录"), click = viewModel::signOut)
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                TextButton(onClick = { deleteAccount = true }, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(vertical = 14.dp)) { Text(uiText("Delete account", "删除账户"), color = MaterialTheme.colorScheme.error) }
+            }
+
         }
     }
     if (showDonation && state.skrDomain != null) DonationDialog(state, viewModel, walletActivityResultSender) { showDonation = false }
     if (deleteAccount) AlertDialog(onDismissRequest = { deleteAccount = false }, icon = { Icon(Icons.Outlined.DeleteOutline, null) }, title = { Text(uiText("Delete account?", "删除账户？")) }, text = { Text(uiText("Your public profile and content will be removed. Public blockchain transactions cannot be deleted.", "你的公开资料和内容将被移除，公开区块链交易无法删除。")) }, confirmButton = { TextButton({ viewModel.deleteAccount { deleteAccount = false } }) { Text(uiText("Delete", "删除"), color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton({ deleteAccount = false }) { Text(uiText("Cancel", "取消")) } })
-    if (showNotifications) AlertDialog(onDismissRequest = { showNotifications = false }, title = { Text(stringResource(R.string.notifications)) }, text = { if (state.notifications.isEmpty()) Text(uiText("No notifications", "暂无通知")) else Column(Modifier.fillMaxHeight(.55f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) { state.notifications.forEach { Text("${it.type}\n${it.createdAt}") } } }, confirmButton = { TextButton({ showNotifications = false }) { Text(uiText("Close", "关闭")) } })
+    if (showNotifications) CommunityNotifications(state, viewModel, { showNotifications = false }, { showNotifications = false; openCampaign(it) }) { showNotifications = false; open(it) }
     if (editProfile) EditProfileDialog(state.myProfile?.bio.orEmpty(), state.myProfile?.socialUrl.orEmpty(), { editProfile = false }) { bio, social -> viewModel.updateProfile(bio, social) { if (it) editProfile = false } }
 }
 
@@ -628,11 +730,25 @@ private fun ProfileScreen(
 @Composable private fun OwnedContentRow(title: String, meta: String, delete: () -> Unit) = Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(meta, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }; IconButton(delete) { Icon(Icons.Outlined.DeleteOutline, stringResource(R.string.delete), tint = MaterialTheme.colorScheme.error) } }
 @Composable private fun BlockedUserRow(skrDomain: String, unblock: () -> Unit) = Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { Column(Modifier.weight(1f)) { Text(skrDomain, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis); Text(uiText("Hidden from your feed", "其内容已隐藏"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }; IconButton(unblock) { Icon(Icons.Outlined.Restore, uiText("Unblock", "解除屏蔽")) } }
 
+
 @Composable
-private fun DetailDialog(target: DetailTarget, state: LionUiState, onClose: () -> Unit, onRequireSignIn: () -> Unit, viewModel: LionViewModel, activity: ComponentActivity) {
+internal fun DetailDialog(initialTarget: DetailTarget, state: LionUiState, onClose: () -> Unit, onRequireSignIn: () -> Unit, viewModel: LionViewModel, activity: ComponentActivity, open: (DetailTarget) -> Unit, feedback: (StoreAppItem) -> Unit, edit: (NeedItem) -> Unit) {
+    AppDetailTheme {
+        DetailDialogContent(initialTarget, state, onClose, onRequireSignIn, viewModel, activity, open, feedback, edit)
+    }
+}
+
+@Composable
+private fun DetailDialogContent(initialTarget: DetailTarget, state: LionUiState, onClose: () -> Unit, onRequireSignIn: () -> Unit, viewModel: LionViewModel, activity: ComponentActivity, open: (DetailTarget) -> Unit, feedback: (StoreAppItem) -> Unit, edit: (NeedItem) -> Unit) {
+    val target = state.detailNeed?.takeIf { initialTarget.kind == "need" && it.id == initialTarget.id }?.toDetailTarget() ?: initialTarget
+    val language = LocalAppLanguage.current
+    var showResponse by rememberSaveable(target.id) { mutableStateOf(false) }
+    var showProgress by rememberSaveable(target.id) { mutableStateOf(false) }
     var showOriginal by rememberSaveable(target.id) { mutableStateOf(false) }
     var comment by rememberSaveable(target.id) { mutableStateOf("") }
-    var replyTo by rememberSaveable(target.id) { mutableStateOf<String?>(null) }
+    var replyTo by rememberSaveable(target.id, stateSaver = jsonStateSaver<CommentItem?>()) { mutableStateOf<CommentItem?>(null) }
+    var showComments by rememberSaveable(target.id) { mutableStateOf(false) }
+    var commentSort by rememberSaveable(target.id) { mutableStateOf("top") }
     var pendingUrl by remember { mutableStateOf<String?>(null) }
     var showReport by rememberSaveable(target.id) { mutableStateOf(false) }
     var confirmBlock by rememberSaveable(target.id) { mutableStateOf(false) }
@@ -640,63 +756,134 @@ private fun DetailDialog(target: DetailTarget, state: LionUiState, onClose: () -
     var confirmSwitchChat by rememberSaveable(target.id) { mutableStateOf(false) }
     val isOwner = state.skrDomain != null && target.author == state.skrDomain
     val promotionActive = target.promotedUntil?.let { it > java.time.Instant.now().toString() } == true
-    LaunchedEffect(target.id) { if (target.kind != "store") viewModel.loadComments(target.kind, target.id) }
+    LaunchedEffect(initialTarget.id, state.skrDomain) {
+        if (target.kind != "store") viewModel.loadComments(target.kind, target.id, commentSort)
+        if (target.kind == "need") viewModel.loadNeed(target.id)
+        if (target.storePackage != null && target.kind != "need") viewModel.loadAppFeedback(target.storePackage)
+    }
     Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             Column(Modifier.statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClose) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) }
-                    Text(target.title, Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.Bold)
-                    if (target.kind != "store" && state.skrDomain != null && !isOwner) IconButton({ confirmBlock = true }) { Icon(Icons.Outlined.Block, uiText("Block user", "屏蔽用户")) }
-                    if (target.kind != "store" && state.skrDomain != null) IconButton({ showReport = true }) { Icon(Icons.Outlined.Flag, uiText("Report", "举报")) }
-                    if (target.kind == "work" && isOwner) IconButton({ confirmDelete = true }) { Icon(Icons.Outlined.DeleteOutline, uiText("Delete work", "删除作品"), tint = MaterialTheme.colorScheme.error) }
-                }
-                LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    item { if (target.kind == "store") MetaRow(target.author, uiText("Official catalog", "官方目录")) else MetaRow(target.author, if (target.kind == "need") stringResource(R.string.needs) else stringResource(R.string.works), { viewModel.loadProfile(target.author) }) }
-                    if (target.kind == "need") item {
-                        RequestBadge(target.requestType, target.budgetSkr)
-                        if (target.requestType == "paid_development") Text(uiText("Budget stated by the author; payment and delivery are not guaranteed.", "预算由需求方自行填写，不代表已付款或交付担保。"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        if (!isOwner) Button(onClick = {
-                            when {
-                                state.skrDomain == null -> onRequireSignIn()
-                                state.activeChat?.needId == target.id -> onClose()
-                                state.activeChat != null && (state.chatDraft.isNotBlank() || state.chatSending) -> confirmSwitchChat = true
-                                else -> viewModel.contactNeed(target.id, target.title, target.author)
+                    IconButton(onClose) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, uiText("Back", "返回"), tint = MaterialTheme.colorScheme.primary) }
+                    Text(if (target.kind == "need") uiText("Post", "帖子详情") else if (target.kind == "work") uiText("Community app", "社区作品") else uiText("Store app", "商店应用"), Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
+                    if (target.kind != "store" && state.skrDomain != null) {
+                        var more by remember { mutableStateOf(false) }
+                        Box {
+                            IconButton({ more = true }) { Icon(Icons.Outlined.MoreVert, uiText("Post options", "帖子选项")) }
+                            DropdownMenu(more, { more = false }) {
+                                if (target.kind == "need" && isOwner && target.need?.campaignId == null) DropdownMenuItem({ Text(uiText("Edit post", "编辑帖子")) }, { more = false; target.need?.let(edit) }, leadingIcon = { Icon(Icons.Outlined.Edit, null) })
+                                if (isOwner) DropdownMenuItem({ Text(uiText("Delete post", "删除帖子")) }, { more = false; confirmDelete = true }, leadingIcon = { Icon(Icons.Outlined.DeleteOutline, null) })
+                                if (!isOwner) DropdownMenuItem({ Text(uiText("Block user", "屏蔽用户")) }, { more = false; confirmBlock = true }, leadingIcon = { Icon(Icons.Outlined.Block, null) })
+                                DropdownMenuItem({ Text(uiText("Report", "举报")) }, { more = false; showReport = true }, leadingIcon = { Icon(Icons.Outlined.Flag, null) })
                             }
-                        }, enabled = !state.chatLoading, modifier = Modifier.fillMaxWidth()) { Text(if (state.activeChat?.needId == target.id) uiText("Return to conversation", "返回对话") else uiText("Discuss this project", "联系需求方")) }
-                    }
-                    item { Text(target.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
-                    if (target.originalBody != null) item { Text("机器翻译，仅供参考；请以原文为准。", style = MaterialTheme.typography.bodySmall); TextButton({ showOriginal = !showOriginal }) { Text(if (showOriginal) "查看中文" else "查看原文") } }
-                    (if (showOriginal) target.originalSummary else target.summary)?.let { summary -> item { SectionTitle(if (target.kind == "need") uiText("Suggested approach", "建议模式") else uiText("Overview", "简介")); Text(summary, style = MaterialTheme.typography.bodyLarge) } }
-                    item {
-                        if (target.needFormat == "wild") SectionTitle(uiText("The spark", "灵感构想"))
-                        Text(if (showOriginal) target.originalBody ?: target.body else target.body, style = MaterialTheme.typography.bodyLarge)
-                    }
-                    target.audience?.let { audience -> item { SectionTitle(uiText("Who needs this", "适用人群")); Text(audience) } }
-                    if (target.media.isNotEmpty()) item {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            items(target.media) { key -> AsyncImage(model = mediaUrl(key), contentDescription = target.title, modifier = Modifier.width(220.dp).height(360.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentScale = ContentScale.Fit) }
                         }
                     }
-                    if (target.url != null) item { Button({ pendingUrl = target.url }, Modifier.fillMaxWidth()) { Icon(Icons.AutoMirrored.Outlined.OpenInNew, null); Spacer(Modifier.width(8.dp)); Text(uiText("Open in Solana dApp Store", "在 Solana dApp Store 中打开")) } }
+                }
+                LazyColumn(Modifier.weight(1f).testTag("detail_list"), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                    if (target.kind == "need") {
+                        item { target.need?.let { PostHero(it) { viewModel.loadProfile(it.authorSkr) } } ?: Text(target.title, style = MaterialTheme.typography.headlineLarge) }
+                        item { PostSection(if (target.needFormat == "wild") uiText("The idea", "灵感构想") else if(target.need?.kind == "feedback") uiText("The experience", "使用体验") else uiText("The need", "需求说明"), "post_content") { PostBody(target.body) } }
+                        target.summary?.takeIf { it.isNotBlank() }?.let { summary -> item { PostSection(uiText("Suggested approach", "解决思路"), "post_approach") { PostBody(summary) } } }
+                        target.audience?.takeIf { it.isNotBlank() }?.let { audience -> item { PostSection(uiText("Who it is for", "适用人群"), "post_audience") { PostBody(audience) } } }
+                        target.need?.storePackage?.let { packageName -> item { PostSection(uiText("Related dApp", "关联应用"), "post_app") { TextButton({ viewModel.openApp(packageName) { open(it.toDetailTarget(language)) } }) { Text(target.need.appName ?: packageName) } } } }
+                        if (target.media.isNotEmpty()) item { PostSection(uiText("Attachments", "附图"), "post_media") {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) { items(target.media) { key -> AsyncImage(model = mediaUrl(key), contentDescription = target.title, modifier = Modifier.width(220.dp).height(300.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant), contentScale = ContentScale.Fit) } }
+                        } }
+                        item { target.need?.let { need -> PostSection(uiText("Progress & participation", "进展与参与"), "post_participation") {
+                            PostProgress(need)
+                            if (target.requestType == "paid_development") Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.surfaceVariant) { Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(uiText("Intended budget: ${need.budgetSkr} SKR", "预算意向：${need.budgetSkr} SKR"), fontWeight = FontWeight.SemiBold)
+                                Text(uiText("Self-reported budget; payment and delivery are not guaranteed.", "预算由作者填写，不代表已付款或交付担保。"), style = MaterialTheme.typography.bodySmall)
+                            } }
+                            need.campaignId?.let { campaign -> OutlinedButton({ open(DetailTarget("campaign", campaign, need.title, need.problem, need.authorSkr)) }, Modifier.fillMaxWidth()) { Icon(Icons.Outlined.Science, null); Spacer(Modifier.width(8.dp)); Text(uiText("View testing campaign", "查看测试活动")) } }
+                            NeedActions(need, state, viewModel, onRequireSignIn, { showResponse = true }, { showProgress = true })
+                            if (!isOwner) TextButton(onClick = {
+                                when {
+                                    state.skrDomain == null -> onRequireSignIn()
+                                    state.activeChat?.needId == target.id -> onClose()
+                                    state.activeChat != null && (state.chatDraft.isNotBlank() || state.chatSending) -> confirmSwitchChat = true
+                                    else -> viewModel.contactNeed(target.id, target.title, target.author)
+                                }
+                            }, enabled = !state.chatLoading, modifier = Modifier.fillMaxWidth()) { Icon(Icons.Outlined.MailOutline, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text(if (state.activeChat?.needId == target.id) uiText("Return to conversation", "返回对话") else uiText("Message author", "私信作者")) }
+                        } } }
+                    } else {
+                        item { AppDetailHero(if (showOriginal) target.copy(summary = target.originalSummary) else target, { pendingUrl = target.url }, { showComments = true }) }
+                        item { AppDetailMetrics(target) }
+                        if (target.media.isNotEmpty()) item { AppPreview(target.media, target.title) }
+                        item { DetailSection(uiText("About this app", "关于这款应用"), "app_about") {
+                            if (target.originalBody != null) {
+                                Text(uiText("Machine translation. Refer to the original for accuracy.", "机器翻译，仅供参考；请以原文为准。"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                TextButton({ showOriginal = !showOriginal }, contentPadding = PaddingValues(0.dp)) { Text(if (showOriginal) uiText("Show translation", "查看中文") else uiText("Show original", "查看原文")) }
+                            }
+                            ExpandableDescription(if (showOriginal) target.originalBody ?: target.body else target.body)
+                            target.work?.demoUrl?.takeIf { it.startsWith("https://") }?.let { demo ->
+                                TextButton({ pendingUrl = demo }, contentPadding = PaddingValues(0.dp)) { Icon(Icons.AutoMirrored.Outlined.OpenInNew, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(uiText("Watch demo", "观看演示")) }
+                            }
+                        } }
+                        if (target.storePackage != null) {
+                            item { DetailSection(uiText("Community feedback", "社区体验反馈"), "app_feedback") {
+                                Text(uiText("Experiences shared on LionDApp.", "来自 LionDApp 用户的体验与见解。"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    FilledTonalButton({ viewModel.openApp(target.storePackage) { feedback(it) } }, Modifier.weight(1f), shape = RoundedCornerShape(50)) { Icon(Icons.Outlined.Edit, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(uiText("Write feedback", "写下体验")) }
+                                    IconButton({ if (state.skrDomain == null) onRequireSignIn() else viewModel.followApp(target.storePackage, !state.appFollowing) }, enabled = !state.communityBusy && !state.detailLoading) { Icon(if (state.appFollowing) Icons.Outlined.CheckCircle else Icons.Outlined.NotificationsNone, if (state.appFollowing) uiText("Following feedback", "已关注应用反馈") else uiText("Follow app feedback", "关注应用反馈"), tint = MaterialTheme.colorScheme.primary) }
+                                }
+                                if (state.detailLoading) CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+                                else if (state.appFeedback.isEmpty()) Surface(shape = RoundedCornerShape(14.dp), color = MaterialTheme.colorScheme.surfaceVariant) { Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(uiText("No community feedback yet", "暂无社区体验反馈"), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                                    Text(uiText("Used this app? Share what worked and what could be better.", "用过这款应用？说说好用的地方，以及你希望改进的部分。"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                } }
+                            } }
+                            items(state.appFeedback, key = { "feedback-${it.id}" }) { entry -> AppFeedbackRow(entry) { open(entry.toDetailTarget()) } }
+                        }
+                        item { DetailSection(uiText("Information", "应用信息"), "app_information") {
+                            target.work?.let { work ->
+                                DetailInfoRow(uiText("Shared by", "分享者"), work.authorSkr) { viewModel.loadProfile(work.authorSkr) }
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                DetailInfoRow(uiText("Category", "分类"), categoryLabel(work.category))
+                                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                                DetailInfoRow(uiText("Published", "发布日期"), detailDate(work.createdAt))
+                                if (work.tags.isNotEmpty()) { HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant); DetailInfoRow(uiText("Tags", "标签"), work.tags.joinToString(" · ")) }
+                                Text(uiText("Shared by a community member. This does not verify developer affiliation.", "由社区用户分享，不代表已认证其开发者身份。"), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            target.storeApp?.let { app ->
+                                app.publisherName?.takeIf(String::isNotBlank)?.let { DetailInfoRow(uiText("Publisher", "发布者"), it); HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
+                                (if (language == "zh") app.categoryNameZh ?: app.categoryName else app.categoryName)?.let { DetailInfoRow(uiText("Category", "分类"), it); HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant) }
+                                DetailInfoRow(uiText("Source", "来源"), app.source)
+                            }
+                            target.storePackage?.let { DetailInfoRow(uiText("Store listing", "商店条目"), uiText("View app", "查看应用")) { viewModel.openApp(it) { app -> open(app.toDetailTarget(language)) } } }
+                        } }
+                    }
                     if (BuildConfig.PROMOTION_PURCHASE_ENABLED && target.kind == "work" && isOwner && target.moderationStatus == "published" && !promotionActive && state.config != null) item {
                         OutlinedButton({ viewModel.promoteWork(target.id) {} }, Modifier.fillMaxWidth()) { Icon(Icons.Outlined.RocketLaunch, null); Spacer(Modifier.width(8.dp)); Text(uiText("Recommend for ${state.config.recommendation.priceSkr} SKR / ${state.config.recommendation.durationDays} days", "支付 ${state.config.recommendation.priceSkr} SKR 推荐 ${state.config.recommendation.durationDays} 天")) }
-                    }
-                    if (target.kind != "store") item { HorizontalDivider(); SectionTitle(stringResource(R.string.comments)) }
-                    if (target.kind != "store") items(state.comments, key = { it.id }) { item ->
-                        Column(Modifier.padding(start = if (item.parentId != null) 20.dp else 0.dp)) { Text(item.authorSkr, modifier = Modifier.clickable { viewModel.loadProfile(item.authorSkr) }, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary); Text(item.body); Row(verticalAlignment = Alignment.CenterVertically) { TextButton({ if (state.skrDomain == null) onRequireSignIn() else viewModel.toggleComment(item.id, target.kind, target.id) }, contentPadding = PaddingValues(horizontal = 4.dp)) { Text("♡ ${item.likeCount}") }; if (item.parentId == null && state.skrDomain != null) TextButton({ replyTo = item.id }) { Text(uiText("Reply", "回复")) } } }
                     }
                 }
                 state.error?.let { error ->
                     Text(userFacingError(error), Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
-                if (target.kind != "store" && state.skrDomain != null) Row(Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(comment, { comment = it }, Modifier.weight(1f), placeholder = { Text(if (replyTo == null) uiText("Write a comment", "写评论") else uiText("Write a reply", "写回复")) }, maxLines = 3)
-                    TextButton(onClick = { if (comment.isNotBlank()) viewModel.comment(target.kind, target.id, comment, replyTo) { if (it) { comment = ""; replyTo = null } } }) { Text(uiText("Post", "发布")) }
-                }
+                if (target.kind != "store") DiscussionEntry(state.comments.size) { showComments = true }
             }
         }
     }
+    if (showComments && target.kind != "store") DiscussionSheet(
+        comments = state.comments, author = target.author, signedIn = state.skrDomain != null,
+        loading = state.commentsLoading, error = state.commentsError ?: state.error, sending = state.communityBusy,
+        sort = commentSort, draft = comment, replyTo = replyTo,
+        close = { showComments = false },
+        changeSort = { commentSort = it; viewModel.loadComments(target.kind, target.id, it) },
+        changeDraft = { comment = it.take(2000) },
+        reply = { if (state.skrDomain == null) onRequireSignIn() else replyTo = it },
+        clearReply = { replyTo = null },
+        post = { if (comment.isNotBlank() && !state.communityBusy) viewModel.comment(target.kind, target.id, comment.trim(), replyTo?.id) { if (it) { comment = ""; replyTo = null } } },
+        signIn = onRequireSignIn,
+        retry = { viewModel.loadComments(target.kind, target.id, commentSort) },
+        like = { if (state.skrDomain == null) onRequireSignIn() else viewModel.toggleComment(it.id, target.kind, target.id) },
+        profile = { showComments = false; viewModel.loadProfile(it) },
+        openApp = { packageName -> showComments = false; viewModel.openApp(packageName) { open(it.toDetailTarget(language)) } },
+        openWork = { id -> showComments = false; viewModel.openWork(id) { open(it.toDetailTarget()) } },
+    )
+    if (showResponse) ResponseComposer(state, viewModel, target.need, false, { showResponse = false })
+    if (showProgress) ResponseComposer(state, viewModel, target.need, true, { showProgress = false })
     pendingUrl?.let { url ->
         AlertDialog(onDismissRequest = { pendingUrl = null }, icon = { Icon(Icons.AutoMirrored.Outlined.OpenInNew, null) }, title = { Text(uiText("Leave LionDApp?", "离开 LionDApp？")) }, text = { Text(url.toUri().getQueryParameter("id") ?: url.toUri().host ?: url) }, confirmButton = { TextButton({ activity.startActivity(Intent(Intent.ACTION_VIEW, url.toUri())); pendingUrl = null }) { Text(uiText("Continue", "继续")) } }, dismissButton = { TextButton({ pendingUrl = null }) { Text(uiText("Cancel", "取消")) } })
     }
@@ -708,7 +895,10 @@ private fun DetailDialog(target: DetailTarget, state: LionUiState, onClose: () -
         dismissButton = { TextButton({ confirmSwitchChat = false }) { Text(uiText("Cancel", "取消")) } },
     )
     if (showReport) ReportDialog(target.kind, target.id, { showReport = false }) { reason, details -> viewModel.report(target.kind, target.id, reason, details) { if (it) showReport = false } }
-    if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, icon = { Icon(Icons.Outlined.DeleteOutline, null) }, title = { Text(uiText("Delete this work?", "删除这个作品？")) }, text = { Text(uiText("It will disappear from LionDApp and cannot be restored.", "它将从 LionDApp 中移除，且无法恢复。")) }, confirmButton = { TextButton({ viewModel.deleteWork(target.id) { deleted -> if (deleted) onClose() }; confirmDelete = false }) { Text(uiText("Delete", "删除"), color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton({ confirmDelete = false }) { Text(uiText("Cancel", "取消")) } })
+    if (confirmDelete) AlertDialog(onDismissRequest = { confirmDelete = false }, icon = { Icon(Icons.Outlined.DeleteOutline, null) }, title = { Text(uiText("Delete this post?", "删除这条内容？")) }, text = { Text(uiText("It will disappear from LionDApp and cannot be restored.", "它将从 LionDApp 中移除，且无法恢复。")) }, confirmButton = { TextButton({
+        if (target.kind == "need") viewModel.deleteNeed(target.id) { if (it) { confirmDelete = false; onClose() } }
+        else viewModel.deleteWork(target.id) { if (it) { confirmDelete = false; onClose() } }
+    }) { Text(uiText("Delete", "删除"), color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton({ confirmDelete = false }) { Text(uiText("Cancel", "取消")) } })
     if (confirmBlock) AlertDialog(onDismissRequest = { confirmBlock = false }, icon = { Icon(Icons.Outlined.Block, null) }, title = { Text(uiText("Block ${target.author}?", "屏蔽 ${target.author}？")) }, text = { Text(uiText("Their posts and comments will be hidden from your account. You can unblock them from Profile.", "其帖子和评论将对你的账户隐藏，可在个人页面解除屏蔽。")) }, confirmButton = { TextButton({ viewModel.blockUser(target.author) { if (it) { confirmBlock = false; onClose() } } }) { Text(uiText("Block", "屏蔽"), color = MaterialTheme.colorScheme.error) } }, dismissButton = { TextButton({ confirmBlock = false }) { Text(uiText("Cancel", "取消")) } })
 }
 
@@ -726,10 +916,10 @@ private fun PublicProfileDialog(skrDomain: String, state: LionUiState, close: ()
             Column(Modifier.statusBarsPadding()) {
                 Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) { IconButton(close) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, null) }; Text(skrDomain, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
                 LazyColumn(contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    state.profilePreview?.bio?.let { item { Text(it) } }
-                    state.profilePreview?.socialUrl?.let { item { Text(it, color = MaterialTheme.colorScheme.secondary) } }
+                    state.profilePreview?.bio?.takeIf(String::isNotBlank)?.let { item { ProfileGroup(uiText("About", "个人介绍")) { PostBody(it) } } }
+                    state.profilePreview?.socialUrl?.takeIf(String::isNotBlank)?.let { item { ProfileGroup(uiText("Links", "相关链接")) { DetailInfoRow(uiText("Website", "网站"), it) } } }
                     if (state.profileNeeds.isNotEmpty()) item { SectionTitle(uiText("Needs", "需求")) }
-                    items(state.profileNeeds, key = { "profile-${it.id}" }) { need -> NeedCard(need, { if (state.skrDomain == null) onRequireSignIn() else viewModel.toggleNeed(need.id) }, author = { viewModel.loadProfile(need.authorSkr) }) { open(DetailTarget("need", need.id, need.title, need.problem, need.authorSkr, summary = need.solutionIdea.takeIf(String::isNotBlank), audience = need.audience, media = need.media, needFormat = need.format, requestType = need.requestType, budgetSkr = need.budgetSkr)) } }
+                    items(state.profileNeeds, key = { "profile-${it.id}" }) { need -> NeedCard(need, { if (state.skrDomain == null) onRequireSignIn() else viewModel.toggleNeed(need.id) }, author = { viewModel.loadProfile(need.authorSkr) }) { open(need.toDetailTarget()) } }
                     if (state.profileWorks.isNotEmpty()) item { SectionTitle(uiText("Works", "作品")) }
                     items(state.profileWorks, key = { "profile-${it.id}" }) { work -> WorkCard(work, { if (state.skrDomain == null) onRequireSignIn() else viewModel.toggleWork(work.id) }, author = { viewModel.loadProfile(work.authorSkr) }) { open(work.toDetailTarget()) } }
                 }
@@ -800,11 +990,14 @@ private fun NeedComposer(categories: List<String>, publishing: Boolean, error: S
 }
 
 @Composable
-private fun WorkComposer(categories: List<String>, submission: WorkSubmissionState, close: () -> Unit, submit: (CreateWorkRequest, List<Uri>) -> Unit) {
+private fun WorkComposer(categories: List<String>, submission: WorkSubmissionState, close: () -> Unit, state: LionUiState, viewModel: LionViewModel, submit: (CreateWorkRequest, List<Uri>) -> Unit) {
+    var storePackage by rememberSaveable { mutableStateOf<String?>(null) }
+    var storeName by rememberSaveable { mutableStateOf<String?>(null) }
+    var showStorePicker by rememberSaveable { mutableStateOf(false) }
     var name by rememberSaveable { mutableStateOf("") }; var summary by rememberSaveable { mutableStateOf("") }; var description by rememberSaveable { mutableStateOf("") }; var demoUrl by rememberSaveable { mutableStateOf("") }; var category by rememberSaveable { mutableStateOf(categories.firstOrNull() ?: "其他") }; var tags by rememberSaveable { mutableStateOf("") }; var media by rememberSaveable { mutableStateOf(arrayListOf<String>()) }
     var showValidation by rememberSaveable { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(6)) { media = ArrayList(it.take(6).map(Uri::toString)) }
-    val hasDraft = name.isNotBlank() || summary.isNotBlank() || description.isNotBlank() || demoUrl.isNotBlank() || tags.isNotBlank() || media.isNotEmpty()
+    val hasDraft = name.isNotBlank() || summary.isNotBlank() || description.isNotBlank() || demoUrl.isNotBlank() || tags.isNotBlank() || media.isNotEmpty() || storePackage != null
     val missing = listOfNotNull(
         uiText("dApp name", "dApp 名称").takeIf { name.isBlank() },
         uiText("one-line introduction", "一句话介绍").takeIf { summary.isBlank() },
@@ -814,7 +1007,12 @@ private fun WorkComposer(categories: List<String>, submission: WorkSubmissionSta
     val submitting = submission.phase == WorkSubmissionPhase.Uploading || submission.phase == WorkSubmissionPhase.Creating
     val succeeded = submission.phase == WorkSubmissionPhase.Success
     ComposerShell(uiText("Submit a work", "提交作品"), hasDraft && !succeeded, close, canClose = !submitting) {
-        FormField(uiText("dApp name", "dApp 名称"), name) { name = it }; FormField(uiText("One-line introduction", "一句话介绍"), summary, 2) { summary = it }; FormField(uiText("Detailed features", "详细功能"), description, 6) { description = it }
+        FormSectionHeading(uiText("App identity", "应用信息"))
+        OutlinedButton({ showStorePicker = true }, Modifier.fillMaxWidth(), enabled = !submitting && !succeeded) { Text(storeName ?: uiText("Link an existing Store app", "关联已上架的商店应用")) }
+        FormField(uiText("dApp name", "dApp 名称"), name) { name = it }; FormField(uiText("One-line introduction", "一句话介绍"), summary, 2) { summary = it }
+        FormSectionHeading(uiText("About the app", "功能介绍"))
+        FormField(uiText("Detailed features", "详细功能"), description, 6) { description = it }
+        FormSectionHeading(uiText("Preview & discovery", "预览与分类"))
         FormField(uiText("Demo video URL (optional)", "演示视频链接（可选）"), demoUrl, 2) { demoUrl = it }; CategoryField(categories, category) { category = it }; FormField(uiText("Tags, separated by commas", "标签，用逗号分隔"), tags) { tags = it }
         OutlinedButton(
             { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
@@ -832,7 +1030,7 @@ private fun WorkComposer(categories: List<String>, submission: WorkSubmissionSta
         } else {
             Button({
                 if (missing.isNotEmpty()) showValidation = true
-                else submit(CreateWorkRequest(name.trim(), summary.trim(), description.trim(), category, tags.split(',').map(String::trim).filter(String::isNotEmpty).take(5), "pending", emptyList(), demoUrl.trim().ifBlank { null }), media.map(Uri::parse))
+                else submit(CreateWorkRequest(name.trim(), summary.trim(), description.trim(), category, tags.split(',').map(String::trim).filter(String::isNotEmpty).take(5), "pending", emptyList(), demoUrl.trim().ifBlank { null }, storePackage), media.map(Uri::parse))
             }, enabled = !submitting, modifier = Modifier.fillMaxWidth()) {
                 if (submitting) {
                     CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
@@ -842,6 +1040,7 @@ private fun WorkComposer(categories: List<String>, submission: WorkSubmissionSta
             }
         }
     }
+    if (showStorePicker) CatalogPicker(state, viewModel, { showStorePicker = false }) { storePackage = it.androidPackage; storeName = it.displayName; if (name.isBlank()) name = it.displayName; showStorePicker = false }
 }
 
 @Composable
@@ -907,7 +1106,7 @@ private fun workSubmissionError(submission: WorkSubmissionState): String {
 }
 
 @Composable
-private fun ComposerShell(title: String, hasDraft: Boolean, close: () -> Unit, canClose: Boolean = true, content: @Composable () -> Unit) {
+internal fun ComposerShell(title: String, hasDraft: Boolean, close: () -> Unit, canClose: Boolean = true, content: @Composable () -> Unit) {
     var confirmDiscard by rememberSaveable { mutableStateOf(false) }
     val requestClose = { if (canClose) { if (hasDraft) confirmDiscard = true else close() } }
     Dialog(
@@ -932,7 +1131,7 @@ private fun ComposerShell(title: String, hasDraft: Boolean, close: () -> Unit, c
         dismissButton = { TextButton({ confirmDiscard = false }) { Text(uiText("Keep editing", "继续编辑")) } },
     )
 }
-@Composable private fun FormField(label: String, value: String, lines: Int = 1, change: (String) -> Unit) = OutlinedTextField(value, change, Modifier.fillMaxWidth(), label = { Text(label) }, minLines = lines, maxLines = maxOf(lines, 8), shape = RoundedCornerShape(6.dp))
+@Composable internal fun FormField(label: String, value: String, lines: Int = 1, change: (String) -> Unit) = OutlinedTextField(value, change, Modifier.fillMaxWidth(), label = { Text(label) }, minLines = lines, maxLines = maxOf(lines, 8), shape = RoundedCornerShape(14.dp))
 
 @Composable
 private fun CategoryField(categories: List<String>, selected: String, change: (String) -> Unit) {
@@ -943,10 +1142,29 @@ private fun CategoryField(categories: List<String>, selected: String, change: (S
 @Composable private fun MetaRow(author: String, category: String, openProfile: (() -> Unit)? = null) = Row(verticalAlignment = Alignment.CenterVertically) { Text(author, Modifier.weight(1f).clickable(enabled = openProfile != null) { openProfile?.invoke() }, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary); Text(categoryLabel(category), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
 @Composable private fun TagRow(tags: List<String>) { if (tags.isNotEmpty()) LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { items(tags) { AssistChip({}, { Text(it) }) } } }
 @Composable private fun Stat(icon: androidx.compose.ui.graphics.vector.ImageVector, value: Int) = Row(verticalAlignment = Alignment.CenterVertically) { Icon(icon, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text(value.toString(), style = MaterialTheme.typography.labelMedium) }
-@Composable private fun SectionTitle(text: String, modifier: Modifier = Modifier) = Text(text, modifier, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+@Composable internal fun SectionTitle(text: String, modifier: Modifier = Modifier) = Text(text, modifier, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 @Composable private fun EmptyState(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, modifier: Modifier = Modifier) = Column(modifier.fillMaxWidth().padding(vertical = 56.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) { Icon(icon, null, Modifier.size(36.dp), tint = MaterialTheme.colorScheme.outline); Text(text, color = MaterialTheme.colorScheme.onSurfaceVariant) }
 @Composable internal fun uiText(english: String, chinese: String): String = if (LocalAppLanguage.current == "zh") chinese else english
 @Composable internal fun userFacingError(code: String): String = when (code) {
+    "campaign_terms_locked" -> uiText("This campaign is published. Its testing terms can no longer be edited.", "活动已发布，测试条件不能再修改。")
+    "campaign_state_conflict" -> uiText("This campaign has changed. Refresh it before retrying.", "活动状态已变化，请刷新后重试。")
+    "draft_reward_required" -> uiText("Keep a positive reward in this draft. Create a separate free invitation if needed.", "悬赏草稿需保留正数奖励；免费邀请请另行创建。")
+    "invalid_campaign_deadline" -> uiText("Choose a deadline between one hour and 30 days from now.", "请设置距现在 1 小时至 30 天内的截止时间。")
+
+    "campaign_post_rules_locked" -> uiText("Published testing terms are locked. Create a new campaign to change them.", "已发布测试规则已锁定，修改请创建新活动。")
+    "testing_campaign_join_required" -> uiText("Reserve a spot from the testing campaign.", "请进入测试活动正式报名。")
+    "testing_obligations_pending" -> uiText("Close and finish your hosted campaigns and pending testing results before deleting this account.", "请先关闭并结清发起的活动及未完成测试成果，再删除账户。")
+    "campaign_not_found" -> uiText("This testing campaign is unavailable.", "测试活动暂不可访问。")
+    "campaign_unavailable_or_already_joined" -> uiText("No spot is available, or you have already joined. Refresh the campaign.", "名额已满或你已报名，请刷新活动。")
+    "entry_revision_conflict", "entry_state_conflict", "entry_state_or_revision_conflict" -> uiText("This result has changed. Refresh the campaign before retrying.", "成果状态已变化，请刷新活动后重试。")
+    "testing_correction_limit" -> uiText("This tester has already revised their report. Approve or reject against the published criteria.", "测试者已补充过一次，请依照公开标准通过或拒绝。")
+    "testing_report_too_short" -> uiText("The report does not meet the minimum character requirement.", "成果尚未达到最低有效字符数要求。")
+    "invalid_testing_evidence" -> uiText("Enter a valid HTTPS evidence link.", "请输入有效的 HTTPS 证明链接。")
+    "campaign_has_unsettled_entries" -> uiText("Pending results or disputes must be resolved before a refund.", "请先处理未结案成果与争议，再退还余额。")
+    "bounty_payments_disabled", "bounty_simulation_disabled" -> uiText("Reward funding is not available in this environment.", "当前环境尚未开放奖励预存。")
+    "cannot_test_own_campaign" -> uiText("You cannot claim a tester spot in your own campaign.", "不能参加自己发起的测试活动。")
+    "network_unavailable" -> uiText("Unable to connect. Check your network and retry.", "暂时无法连接，请检查网络后重试。")
+    "work_not_found", "content_not_found", "target_not_found" -> uiText("This content is no longer available.", "这条内容已不可访问。")
     "receipt_storage_unavailable" -> uiText("Unable to save the payment receipt. No wallet request was made.", "无法保存交易记录，尚未打开钱包付款。")
     "donations_disabled" -> uiText("Tipping has not opened yet.", "打赏尚未开放。")
     "donation_rpc_unavailable", "donation_wrong_network" -> uiText("The payment network is unavailable. No new payment was requested.", "支付网络暂不可用，尚未发起新的付款。")
@@ -965,7 +1183,7 @@ private fun CategoryField(categories: List<String>, selected: String, change: (S
     "work_images_3_to_6_required" -> uiText("Choose 3-6 images for this work.", "请为作品选择 3-6 张图片。")
     else -> code
 }
-@Composable private fun categoryLabel(value: String): String {
+@Composable internal fun categoryLabel(value: String): String {
     val english = mapOf("天马行空" to "Wild Ideas", "支付" to "Payments", "游戏" to "Games", "社交" to "Social", "效率工具" to "Productivity", "开发者工具" to "Developer tools", "教育" to "Education", "其他" to "Other")
     return if (LocalAppLanguage.current == "zh") value else english[value] ?: value
 }

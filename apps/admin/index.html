@@ -33,6 +33,7 @@
       <button data-view="works"><span data-i18n="nav.works">Work review</span><span class="nav-count" id="pending-nav">—</span></button>
       <button data-view="content"><span data-i18n="nav.content">Content</span></button>
       <button data-view="reports"><span data-i18n="nav.reports">Reports</span><span class="nav-count alert" id="reports-nav">—</span></button>
+      <button data-view="testing"><span data-i18n="nav.testing">Testing disputes</span></button>
       <button data-view="people"><span data-i18n="nav.people">People</span></button>
       <button data-view="promotions"><span data-i18n="nav.promotions">Promotions</span></button>
       <button data-view="system"><span data-i18n="nav.system">System</span></button>
@@ -96,6 +97,10 @@
         <select id="report-filter" data-i18n-aria="reports.status"><option value="open" data-i18n="status.open">Open</option><option value="all" data-i18n="status.all">All statuses</option><option value="resolved" data-i18n="status.resolved">Resolved</option><option value="dismissed" data-i18n="status.dismissed">Dismissed</option></select>
       </div>
       <div id="report-list" class="record-list"></div>
+    </section>
+    <section id="testing" class="view hidden">
+      <div class="page-head"><div><p class="eyebrow" data-i18n="section.safety">SAFETY</p><h1 data-i18n="nav.testing">Testing disputes</h1></div><span id="testing-count" class="count-label"></span></div>
+      <div id="testing-list" class="record-list"></div>
     </section>
     <section id="people" class="view hidden">
       <div class="page-head"><div><p class="eyebrow" data-i18n="section.identities">IDENTITIES</p><h1 data-i18n="nav.people">People</h1></div><span id="people-count" class="count-label"></span></div>

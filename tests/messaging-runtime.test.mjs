@@ -102,7 +102,7 @@ test('two isolated identities retain replies, read positions and withdrawals aft
   } finally { x.sqlite.close(); rmSync(directory, { recursive: true, force: true }); }
 });
 
-test('free and paid budgets validate strictly and paid needs lead every feed sort and search', async () => {
+test('budgets validate strictly without overriding feed sort and can be filtered explicitly', async () => {
   const x = setup();
   for (const [type, budget, status] of [['free', null, 201], ['paid_development', 100, 201], ['paid_development', 0, 400], ['paid_development', 1.5, 400], ['paid_development', '100', 400], ['invalid', 100, 400]]) {
     x.sqlite.exec('DELETE FROM rate_limits');
@@ -110,11 +110,14 @@ test('free and paid budgets validate strictly and paid needs lead every feed sor
   }
   x.sqlite.exec("DELETE FROM rate_limits; UPDATE needs SET need_count=999 WHERE request_type='free'");
   assert.equal((await x.request('/v1/needs', { ...need, requestType: 'paid_development', budgetSkr: 200 })).status, 201);
+  x.sqlite.exec("UPDATE needs SET created_at='2090-01-01',comment_count=999 WHERE request_type='free'");
   for (const path of ['/v1/needs?sort=latest', '/v1/needs?sort=needed', '/v1/needs?sort=discussed', '/v1/search?q=Build']) {
     const data = await (await x.request(path)).json(); const items = data.items ?? data.needs;
-    assert.deepEqual(items.slice(0,2).map(x => x.budget_skr), [200,100]);
-    assert(items.slice(2).every(x => x.request_type === 'free'));
+    assert.equal(items[0].request_type, 'free');
   }
+  const paid = await (await x.request('/v1/needs?paid=true')).json();
+  assert.equal(paid.items.length,2);
+  assert(paid.items.every(item => item.request_type === 'paid_development'));
   x.sqlite.close();
 });
 

@@ -65,7 +65,32 @@ class ApiClient internal constructor(engine: HttpClientEngine) {
     fun close() = client.close()
 
     suspend fun config(): PublicConfig = get("/v1/config")
-    suspend fun needs(sort: String, category: String? = null): NeedListResponse = get("/v1/needs?sort=$sort${category?.let { "&category=" + java.net.URLEncoder.encode(it, Charsets.UTF_8.name()) } ?: ""}")
+    suspend fun campaignConfig(): CampaignConfig = get("/v1/campaigns/config")
+    suspend fun campaigns(scope: String, cursor: String? = null): CampaignListResponse = get("/v1/campaigns?scope=$scope" + (cursor?.let { "&cursor=" + java.net.URLEncoder.encode(it, "UTF-8") } ?: ""))
+    suspend fun campaign(id: String): TestingCampaign = get("/v1/campaigns/$id")
+    suspend fun campaignEntries(id: String): TestingEntriesResponse = get("/v1/campaigns/$id/entries")
+    suspend fun createCampaign(request: CreateCampaignRequest): TestingCampaign = post("/v1/campaigns",request,true)
+    suspend fun updateCampaign(id: String, request: CreateCampaignRequest): TestingCampaign = put("/v1/campaigns/$id",request)
+    suspend fun campaignAction(id: String, action: String): TestingCampaign = post("/v1/campaigns/$id/$action",emptyMap<String,String>(),true)
+    suspend fun submitTestingReport(id: String, request: TestingReportRequest): TestingEntry = post("/v1/testing-entries/$id/submit",request,true)
+    suspend fun reviewTestingReport(id: String, request: TestingReviewRequest): TestingEntry = post("/v1/testing-entries/$id/review",request,true)
+    suspend fun testingEntryAction(id: String, action: String, request: TestingActionRequest): TestingEntry = post("/v1/testing-entries/$id/$action",request,true)
+    suspend fun needs(sort: String, category: String? = null, kind: String? = null, status: String? = null, paid: Boolean = false): NeedListResponse = get("/v1/needs?sort=$sort${category?.let { "&category=" + java.net.URLEncoder.encode(it, Charsets.UTF_8.name()) } ?: ""}${kind?.let { "&kind=$it" } ?: ""}${status?.let { "&status=$it" } ?: ""}${if (paid) "&paid=true" else ""}")
+    suspend fun discover(): DiscoveryResponse = get("/v1/discover")
+    suspend fun need(id: String): NeedItem = get("/v1/needs/$id")
+    suspend fun work(id: String): WorkItem = get("/v1/works/$id")
+    suspend fun storeApp(id: String): StoreAppItem = get("/v1/store-apps/${UriEncode(id)}")
+    suspend fun appFeedback(id: String): NeedListResponse = get("/v1/store-apps/${UriEncode(id)}/feedback")
+    suspend fun following(): NeedListResponse = get("/v1/following")
+    suspend fun followingApps(): StoreAppListResponse = get("/v1/following-apps")
+    suspend fun appFollowing(id: String): AppFollowState = get("/v1/store-apps/${UriEncode(id)}/follow")
+    suspend fun followApp(id: String): UpdatedResponse = put("/v1/store-apps/${UriEncode(id)}/follow", emptyMap<String,String>())
+    suspend fun unfollowApp(id: String) = delete("/v1/store-apps/${UriEncode(id)}/follow")
+    suspend fun follow(id: String, wantsTest: Boolean): UpdatedResponse = put("/v1/needs/$id/follow", FollowRequest(wantsTest))
+    suspend fun unfollow(id: String) = delete("/v1/needs/$id/follow")
+    suspend fun updateNeed(id: String, request: CreateNeedRequest): UpdatedResponse = put("/v1/needs/$id", request)
+    suspend fun progress(id: String, request: ProgressRequest): UpdatedResponse = post("/v1/needs/$id/progress", request, true)
+    suspend fun readNotification(id: String): UpdatedResponse = post("/v1/notifications/${UriEncode(id)}/read", emptyMap<String, String>(), true)
     suspend fun works(sort: String, category: String? = null): WorkListResponse = get("/v1/works?sort=$sort${category?.let { "&category=" + java.net.URLEncoder.encode(it, Charsets.UTF_8.name()) } ?: ""}")
     suspend fun search(query: String): SearchResponse = get("/v1/search?q=${java.net.URLEncoder.encode(query, Charsets.UTF_8.name())}")
     suspend fun storeApps(query: String = ""): StoreAppListResponse = get("/v1/store-apps${if (query.isBlank()) "" else "?q=" + java.net.URLEncoder.encode(query, Charsets.UTF_8.name())}")
@@ -84,8 +109,8 @@ class ApiClient internal constructor(engine: HttpClientEngine) {
     suspend fun reactToComment(id: String): ReactionResponse = post("/v1/comments/$id/reaction", emptyMap<String, String>(), true)
     suspend fun report(request: ReportRequest): CreatedResponse = post("/v1/reports", request, true)
     suspend fun comments(kind: String, id: String, sort: String = "top"): CommentListResponse = get("/v1/${kind}s/$id/comments?sort=$sort")
-    suspend fun comment(kind: String, id: String, body: String, parentId: String? = null): CreatedResponse =
-        post("/v1/${kind}s/$id/comments", CreateCommentRequest(body, parentId), true)
+    suspend fun comment(kind: String, id: String, body: String, parentId: String? = null, responseKind: String = "discussion", linkedStorePackage: String? = null, linkedWorkId: String? = null): CreatedResponse =
+        post("/v1/${kind}s/$id/comments", CreateCommentRequest(body, parentId, responseKind, linkedStorePackage, linkedWorkId), true)
     suspend fun uploadImage(bytes: ByteArray, mimeType: String): MediaUploadResponse {
         val response = client.post(BuildConfig.API_BASE_URL + "/v1/media") {
             authorize()
@@ -148,6 +173,8 @@ class ApiClient internal constructor(engine: HttpClientEngine) {
     private fun io.ktor.client.request.HttpRequestBuilder.authorize() {
         sessionToken?.let { header(HttpHeaders.Authorization, "Bearer $it") }
     }
+
+    private fun UriEncode(value: String) = java.net.URLEncoder.encode(value, "UTF-8")
 
     private suspend inline fun <reified T> io.ktor.client.statement.HttpResponse.decode(): T {
         if (!status.isSuccess()) {

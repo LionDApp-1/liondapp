@@ -1,0 +1,12 @@
+{
+  "videoUrl": "https://youtu.be/JaMHQUdflUQ",
+  "visibility": "public",
+  "publishedDate": "2026-10-06",
+  "language": "English",
+  "durationSeconds": 142,
+  "subtitleFile": "LionDApp_Demo_EN.srt",
+  "deckFile": "LionDApp_ClockIn_2026_Deck_EN.pptx",
+  "deckSha256": "2abf1f1cffa5ae495092049356b6435f22fbabb1c61f70ef464896369e76fa0e",
+  "hackathonStatus": "prepared, not submitted",
+  "anonymousPlayback": "Verified in Chrome Incognito without login, player duration 2:22 and English captions visible"
+}

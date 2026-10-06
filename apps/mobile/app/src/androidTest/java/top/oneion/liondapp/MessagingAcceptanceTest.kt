@@ -192,9 +192,10 @@ class MessagingAcceptanceTest {
             }
             var status = HttpStatusCode.OK
             val body = when {
+                path == "/v1/discover" -> "{}"
                 path == "/v1/config" -> """{"categories":[],"recommendation":{"priceSkr":10,"durationDays":7},"environment":"devnet"}"""
                 path == "/v1/me" -> """{"profile":{"skr_domain":"dev.skr","created_at":"2026-09-16T00:00:00Z"}}"""
-                path == "/v1/needs" || path == "/v1/works" || path == "/v1/notifications" || path == "/v1/blocks" || path == "/v1/conversations" -> """{"items":[]}"""
+                path == "/v1/needs" || path == "/v1/works" || path == "/v1/notifications" || path == "/v1/blocks" || path == "/v1/conversations" || path == "/v1/following" || path == "/v1/following-apps" -> """{"items":[]}"""
                 path.endsWith("/messages") && request.method == HttpMethod.Post -> {
                     if (delaySend) { entered.complete(Unit); release.await() }
                     val payload = Json.decodeFromString<SendMessageRequest>((request.body as TextContent).text)

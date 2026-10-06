@@ -17,6 +17,8 @@ export interface Env {
   PAYMENT_MODE: "simulation" | "onchain";
   SOLANA_RPC_URL: string;
   DONATIONS_ENABLED?: string;
+  BOUNTY_FEE_RECIPIENT?: string;
+  BOUNTY_MODE?: 'disabled' | 'simulation' | 'onchain';
   DONATION_RPC_URL?: string;
   IDENTITY_RPC_URL_SECRET: string;
   CF_ACCESS_TEAM_DOMAIN?: string;

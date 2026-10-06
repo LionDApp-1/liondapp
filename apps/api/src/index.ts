@@ -1,5 +1,6 @@
 import { adminAuthRoute } from "./admin-password";
 import { operationsRoute } from "./operations";
+import { campaignsRoute, campaignMode } from "./campaigns";
 import { PublicKey } from "@solana/web3.js";
 import { requireAdmin, requireAccessAdmin } from "./admin";
 import { optionalSession, requireSession, resolveSkrDomain } from "./auth";
@@ -13,6 +14,7 @@ import { serializeStoreApp, syncStoreCatalog, translateStoreCatalogBatch, runCat
 import { translationBudgetStatus } from "./translation-budget";
 import { chatRoute } from "./chat";
 import { donationRoute, donationsEnabled } from "./donations";
+import { communityRoute, enrichNeeds, assertCatalogApp, responsePayload, needNotification, visibleNeed } from './community';
 
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const MAX_MEDIA_BODY_BYTES = MAX_IMAGE_BYTES + 64 * 1024;
@@ -50,11 +52,14 @@ export default {
 async function route(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/$/, "") || "/";
+  if (path.startsWith('/v1/campaigns') || path.startsWith('/v1/testing-entries/') || path.startsWith('/admin/testing-')) return campaignsRoute(path,request,env,{moderate:enforceContentPolicy,rate:consumeRate});
   if (path.startsWith("/admin/auth/")) return adminAuthRoute(path, request, env, requireAccessAdmin);
   if (path.startsWith("/v1/donations/") || path === "/admin/donations/readiness") return donationRoute(path, request, env, consumeRate);
   if (path.startsWith("/v1/conversations") || path.startsWith("/admin/message-reports")) {
     return chatRoute(path, request, env, { moderate: enforceContentPolicy, rate: consumeRate });
   }
+  const community = await communityRoute(path, request, env, { moderate: enforceContentPolicy, rate: consumeRate, serializeNeed });
+  if (community) return community;
 
   if (request.method === "GET" && path === "/health") return health(env);
   if (request.method === "GET" && path === "/v1/config") return publicConfig(env);
@@ -114,7 +119,7 @@ function match(path: string, pattern: RegExp): string | null {
 
 async function health(env: Env): Promise<Response> {
   const row = await env.DB.prepare("SELECT value FROM config WHERE key = 'mainnet_payments_enabled'").first<{ value: string }>();
-  return json({ service: "liondapp-api", environment: env.ENVIRONMENT, paymentMode: env.PAYMENT_MODE, mainnetPaymentsEnabled: row?.value === "true", donationsEnabled: donationsEnabled(env), moderationVersion: MODERATION_VERSION, moderationMode: "rules-and-ai" });
+  return json({ service: "liondapp-api", environment: env.ENVIRONMENT, paymentMode: env.PAYMENT_MODE, bountyPaymentMode: campaignMode(env), mainnetPaymentsEnabled: row?.value === "true", donationsEnabled: donationsEnabled(env), moderationVersion: MODERATION_VERSION, moderationMode: "rules-and-ai" });
 }
 
 async function publicConfig(env: Env): Promise<Response> {
@@ -196,33 +201,42 @@ async function listNeeds(request: Request, url: URL, env: Env): Promise<Response
   const viewer = await optionalSession(request, env);
   const sort = url.searchParams.get("sort") ?? "latest";
   const secondary = sort === "needed" ? "need_count DESC," : sort === "discussed" ? "comment_count DESC," : "";
-  const order = `CASE WHEN request_type='paid_development' THEN 0 ELSE 1 END, COALESCE(budget_skr, 0) DESC, ${secondary} created_at DESC, id DESC`;
+  const order = `${secondary} created_at DESC, id DESC`;
   const category = url.searchParams.get("category");
-  const sql = `SELECT * FROM needs WHERE deleted_at IS NULL ${category ? "AND category = ?" : ""} ${viewer ? "AND author_skr NOT IN (SELECT blocked_skr FROM user_blocks WHERE blocker_skr = ?)" : ""} ORDER BY ${order} LIMIT 50`;
-  const values = [...(category ? [category] : []), ...(viewer ? [viewer.skrDomain] : [])];
+  const kind = url.searchParams.get('kind');
+  const status = url.searchParams.get('status');
+  const paid = url.searchParams.get('paid') === 'true';
+  const sql = `SELECT * FROM needs WHERE deleted_at IS NULL ${category ? "AND category = ?" : ""} ${kind ? 'AND kind=?' : ''} ${status ? 'AND status=?' : ''} ${paid ? "AND request_type='paid_development'" : ''} ${viewer ? "AND author_skr NOT IN (SELECT blocked_skr FROM user_blocks WHERE blocker_skr = ?)" : ""} ORDER BY ${order} LIMIT 50`;
+  const values = [...(category ? [category] : []), ...(kind ? [kind] : []), ...(status ? [status] : []), ...(viewer ? [viewer.skrDomain] : [])];
   const statement = env.DB.prepare(sql);
   const result = values.length ? await statement.bind(...values).all() : await statement.all();
-  return json({ items: result.results.filter((row) => isPublicContentAllowed("need", row)).map(serializeNeed) });
+  return json({ items: (await enrichNeeds(env, result.results.filter((row) => isPublicContentAllowed("need", row)), viewer)).map(serializeNeed) });
 }
 
 async function getNeed(needId: string, request: Request, env: Env): Promise<Response> {
-  const row = await env.DB.prepare("SELECT * FROM needs WHERE id = ? AND deleted_at IS NULL").bind(needId).first();
-  if (!row || !isPublicContentAllowed("need", row)) throw new ApiError(404, "need_not_found");
-  await assertAuthorVisible(request, String(row.author_skr), env);
-  return json(serializeNeed(row));
+  const viewer = await optionalSession(request, env);
+  const row = await visibleNeed(env, needId, viewer);
+  return json(serializeNeed((await enrichNeeds(env, [row], viewer))[0]));
 }
 
 async function createNeed(request: Request, env: Env): Promise<Response> {
   const user = await requireSession(request, env);
   await consumeRate(env, user.skrDomain, "post", 60);
   const payload = needPayload(await readJson(request));
+  await assertCatalogApp(env, payload.storePackage);
   await enforceContentPolicy(env, user, "need", [payload.title, payload.problem, payload.solutionIdea, payload.audience, ...payload.tags]);
   await assertMediaOwnership(payload.mediaKeys, user.skrDomain, env);
   const needId = id("need");
   const createdAt = now();
-  await env.DB.prepare(`INSERT INTO needs(id,author_skr,title,problem,solution_idea,audience,category,tags_json,media_json,format,request_type,budget_skr,created_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(needId, user.skrDomain, payload.title, payload.problem, payload.solutionIdea, payload.audience,
-      payload.category, JSON.stringify(payload.tags), JSON.stringify(payload.mediaKeys), payload.format, payload.requestType, payload.budgetSkr, createdAt).run();
+  const statements = [env.DB.prepare(`INSERT INTO needs(id,author_skr,title,problem,solution_idea,audience,category,tags_json,media_json,format,request_type,budget_skr,created_at,kind,feedback_type,store_package)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(needId, user.skrDomain, payload.title, payload.problem, payload.solutionIdea, payload.audience,
+      payload.category, JSON.stringify(payload.tags), JSON.stringify(payload.mediaKeys), payload.format, payload.requestType, payload.budgetSkr, createdAt,payload.kind,payload.feedbackType,payload.storePackage)];
+  if (payload.kind === 'feedback') statements.push(env.DB.prepare(`INSERT INTO notifications(id,recipient_skr,type,payload_json,created_at)
+    SELECT ? || ':' || f.identity_skr,f.identity_skr,'app_feedback',?,? FROM app_followers f JOIN users u ON u.skr_domain=f.identity_skr
+    WHERE f.store_package=? AND u.status='active' AND f.identity_skr!=?
+    AND NOT EXISTS(SELECT 1 FROM user_blocks WHERE (blocker_skr=f.identity_skr AND blocked_skr=?) OR (blocker_skr=? AND blocked_skr=f.identity_skr))`)
+    .bind(id('notification'),JSON.stringify({targetType:'need',targetId:needId,title:payload.title,actor:user.skrDomain}),createdAt,payload.storePackage,user.skrDomain,user.skrDomain,user.skrDomain));
+  await env.DB.batch(statements);
   return json({ id: needId, createdAt }, 201);
 }
 
@@ -252,13 +266,15 @@ async function createWork(request: Request, env: Env): Promise<Response> {
   const user = await requireSession(request, env);
   await consumeRate(env, user.skrDomain, "post", 60);
   const payload = workPayload(await readJson(request));
+  await assertCatalogApp(env, payload.storePackage);
   await enforceContentPolicy(env, user, "work", [payload.name, payload.summary, payload.description, payload.demoUrl ?? "", ...payload.tags]);
   await assertMediaOwnership([payload.iconKey, ...payload.screenshotKeys], user.skrDomain, env);
   const workId = id("work");
   const createdAt = now();
-  await env.DB.prepare(`INSERT INTO works(id,author_skr,name,summary,description,store_url,category,tags_json,icon_key,screenshots_json,demo_url,created_at)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).bind(workId, user.skrDomain, payload.name, payload.summary, payload.description, payload.storeUrl,
-      payload.category, JSON.stringify(payload.tags), payload.iconKey, JSON.stringify(payload.screenshotKeys), payload.demoUrl, createdAt).run();
+  const store = payload.storePackage ? await env.DB.prepare('SELECT store_url FROM store_catalog WHERE android_package=?').bind(payload.storePackage).first<{store_url: string}>() : null;
+  await env.DB.prepare(`INSERT INTO works(id,author_skr,name,summary,description,store_url,category,tags_json,icon_key,screenshots_json,demo_url,created_at,store_package)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`).bind(workId, user.skrDomain, payload.name, payload.summary, payload.description, store?.store_url ?? payload.storeUrl,
+      payload.category, JSON.stringify(payload.tags), payload.iconKey, JSON.stringify(payload.screenshotKeys), payload.demoUrl, createdAt,payload.storePackage).run();
   return json({ id: workId, status: "pending", createdAt }, 201);
 }
 
@@ -269,13 +285,13 @@ async function search(request: Request, url: URL, env: Env): Promise<Response> {
   const pattern = `%${query.replaceAll("\\", "\\\\").replaceAll("%", "\\%").replaceAll("_", "\\_")}%`;
   const hidden = viewer ? "AND author_skr NOT IN (SELECT blocked_skr FROM user_blocks WHERE blocker_skr = ?)" : "";
   const [needs, works] = await Promise.all([
-    env.DB.prepare(`SELECT * FROM needs WHERE deleted_at IS NULL AND (title LIKE ? ESCAPE '\\' OR problem LIKE ? ESCAPE '\\' OR solution_idea LIKE ? ESCAPE '\\' OR audience LIKE ? ESCAPE '\\' OR tags_json LIKE ? ESCAPE '\\') ${hidden} ORDER BY CASE WHEN request_type='paid_development' THEN 0 ELSE 1 END, COALESCE(budget_skr,0) DESC, need_count DESC,created_at DESC LIMIT 30`)
+    env.DB.prepare(`SELECT * FROM needs WHERE deleted_at IS NULL AND (title LIKE ? ESCAPE '\\' OR problem LIKE ? ESCAPE '\\' OR solution_idea LIKE ? ESCAPE '\\' OR audience LIKE ? ESCAPE '\\' OR tags_json LIKE ? ESCAPE '\\') ${hidden} ORDER BY need_count DESC,created_at DESC LIMIT 30`)
       .bind(pattern, pattern, pattern, pattern, pattern, ...(viewer ? [viewer.skrDomain] : [])).all(),
     env.DB.prepare(`SELECT * FROM works WHERE deleted_at IS NULL AND moderation_status='published' AND (name LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR tags_json LIKE ? ESCAPE '\\') ${hidden} ORDER BY like_count DESC,created_at DESC LIMIT 30`)
       .bind(pattern, pattern, pattern, pattern, ...(viewer ? [viewer.skrDomain] : [])).all(),
   ]);
   const storeApps = await searchStoreCatalog(query, 30, env);
-  return json({ needs: needs.results.filter((row) => isPublicContentAllowed("need", row)).map(serializeNeed), works: works.results.filter((row) => isPublicContentAllowed("work", row)).map(serializeWork), storeApps: storeApps.results.map(serializeStoreApp) });
+  return json({ needs: (await enrichNeeds(env, needs.results.filter((row) => isPublicContentAllowed("need", row)), viewer)).map(serializeNeed), works: works.results.filter((row) => isPublicContentAllowed("work", row)).map(serializeWork), storeApps: storeApps.results.map(serializeStoreApp) });
 }
 
 async function listStoreApps(url: URL, env: Env): Promise<Response> {
@@ -316,9 +332,23 @@ async function listComments(targetType: "need" | "work", targetId: string, reque
   await assertTargetExists(targetType, targetId, env);
   const sort = url.searchParams.get("sort") === "latest" ? "created_at DESC" : "like_count DESC, created_at DESC";
   const hidden = viewer ? "AND author_skr NOT IN (SELECT blocked_skr FROM user_blocks WHERE blocker_skr = ?)" : "";
-  const result = await env.DB.prepare(`SELECT * FROM comments WHERE target_type=? AND target_id=? AND deleted_at IS NULL ${hidden} ORDER BY parent_id IS NOT NULL, ${sort} LIMIT 200`)
+  const result = await env.DB.prepare(`SELECT comments.*,
+    (SELECT display_name FROM store_catalog WHERE android_package=linked_store_package) AS linked_app_name
+    FROM comments WHERE target_type=? AND target_id=? AND deleted_at IS NULL ${hidden} ORDER BY parent_id IS NOT NULL, ${sort} LIMIT 200`)
     .bind(targetType, targetId, ...(viewer ? [viewer.skrDomain] : [])).all();
   const rows = result.results.filter((row) => isPublicContentAllowed("comment", row)) as Array<Record<string, unknown>>;
+  const linkedIds = [...new Set(rows.map(row => row.linked_work_id).filter(Boolean))];
+  if (linkedIds.length) {
+    const linked = await env.DB.prepare(`SELECT w.* FROM works w JOIN users u ON u.skr_domain=w.author_skr
+      WHERE w.id IN (${linkedIds.map(() => '?').join(',')}) AND w.deleted_at IS NULL AND w.moderation_status='published' AND u.status='active'
+      ${viewer ? 'AND NOT EXISTS(SELECT 1 FROM user_blocks WHERE blocker_skr=? AND blocked_skr=w.author_skr)' : ''}`)
+      .bind(...linkedIds,...(viewer ? [viewer.skrDomain] : [])).all<Record<string, unknown>>();
+    const names = new Map(linked.results.filter(row => isPublicContentAllowed('work',row)).map(row => [row.id,row.name]));
+    for (const row of rows) {
+      row.linked_work_name = names.get(row.linked_work_id) ?? null;
+      if (!row.linked_work_name) row.linked_work_id = null;
+    }
+  }
   const top = rows.filter((row) => row.parent_id == null);
   const replies = new Map<string, Array<Record<string, unknown>>>();
   rows.filter((row) => row.parent_id != null).forEach((row) => {
@@ -332,26 +362,35 @@ async function createComment(targetType: "need" | "work", targetId: string, requ
   const user = await requireSession(request, env);
   await consumeRate(env, user.skrDomain, "comment", 10);
   await assertTargetExists(targetType, targetId, env);
-  const payload = commentPayload(await readJson(request));
+  await assertAuthorVisible(request, String((await env.DB.prepare(`SELECT author_skr FROM ${targetType === 'need' ? 'needs' : 'works'} WHERE id=?`).bind(targetId).first())?.author_skr), env);
+  const body = await readJson(request);
+  const payload = commentPayload(body);
+  const response = await responsePayload(env, body, targetType, user);
   await enforceContentPolicy(env, user, "comment", [payload.body]);
   if (payload.parentId) {
-    const parent = await env.DB.prepare("SELECT parent_id FROM comments WHERE id=? AND target_type=? AND target_id=? AND deleted_at IS NULL")
-      .bind(payload.parentId, targetType, targetId).first<{ parent_id: string | null }>();
-    if (!parent || parent.parent_id) throw new ApiError(400, "invalid_comment_parent");
+    const parent = await env.DB.prepare("SELECT * FROM comments WHERE id=? AND target_type=? AND target_id=? AND deleted_at IS NULL")
+      .bind(payload.parentId, targetType, targetId).first<Record<string, unknown>>();
+    if (!parent || parent.parent_id || !isPublicContentAllowed('comment',parent)) throw new ApiError(400, "invalid_comment_parent");
+    await assertAuthorVisible(request,String(parent.author_skr),env);
   }
   const commentId = id("comment");
   const createdAt = now();
   const table = targetType === "need" ? "needs" : "works";
-  const target = await env.DB.prepare(`SELECT author_skr FROM ${table} WHERE id=?`).bind(targetId).first<{ author_skr: string }>();
+  const target = await env.DB.prepare(`SELECT * FROM ${table} WHERE id=?`).bind(targetId).first<Record<string, unknown>>();
   const parent = payload.parentId ? await env.DB.prepare("SELECT author_skr FROM comments WHERE id=?").bind(payload.parentId).first<{ author_skr: string }>() : null;
   const statements = [
-    env.DB.prepare("INSERT INTO comments(id,author_skr,target_type,target_id,parent_id,body,created_at) VALUES(?,?,?,?,?,?,?)")
-      .bind(commentId, user.skrDomain, targetType, targetId, payload.parentId, payload.body, createdAt),
+    env.DB.prepare("INSERT INTO comments(id,author_skr,target_type,target_id,parent_id,body,created_at,response_kind,linked_store_package,linked_work_id) VALUES(?,?,?,?,?,?,?,?,?,?)")
+      .bind(commentId, user.skrDomain, targetType, targetId, payload.parentId, payload.body, createdAt,response.responseKind,response.linkedStorePackage,response.linkedWorkId),
   ];
   const recipient = parent?.author_skr ?? target?.author_skr;
-  if (recipient && recipient !== user.skrDomain) statements.push(
-    env.DB.prepare("INSERT INTO notifications(id,recipient_skr,type,payload_json,created_at) VALUES(?,?,?,?,?)")
-      .bind(id("notification"), recipient, parent ? "comment_reply" : "content_comment", JSON.stringify({ targetType, targetId, commentId }), createdAt),
+  if (targetType === 'need') statements.push(needNotification(env,targetId,user.skrDomain,'need_response',{ title: target?.title, actor: user.skrDomain, commentId, responseKind: response.responseKind }));
+  if (recipient && recipient !== user.skrDomain && (targetType === 'work' || (parent && recipient !== target?.author_skr))) statements.push(
+    env.DB.prepare(`INSERT INTO notifications(id,recipient_skr,type,payload_json,created_at)
+      SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM users WHERE skr_domain=? AND status='active')
+      AND NOT EXISTS(SELECT 1 FROM user_blocks WHERE (blocker_skr=? AND blocked_skr=?) OR (blocker_skr=? AND blocked_skr=?))
+      ${targetType === 'need' ? 'AND NOT EXISTS(SELECT 1 FROM need_followers WHERE need_id=? AND identity_skr=?)' : ''}`)
+      .bind(id("notification"), recipient, parent ? "comment_reply" : "content_comment", JSON.stringify({ targetType, targetId, commentId, title: target?.title ?? target?.name, actor: user.skrDomain }), createdAt,
+        recipient,recipient,user.skrDomain,user.skrDomain,recipient,...(targetType === 'need' ? [targetId,recipient] : [])),
   );
   await env.DB.batch(statements);
   return json({ id: commentId, createdAt }, 201);
@@ -378,6 +417,7 @@ async function toggleReaction(kind: string, targetId: string, request: Request, 
 
 async function deleteOwned(table: "needs" | "works" | "comments", targetId: string, request: Request, env: Env): Promise<Response> {
   const user = await requireSession(request, env);
+  if(table==='needs' && await env.DB.prepare("SELECT 1 FROM testing_campaigns WHERE post_id=? AND creator_skr=? AND status NOT IN ('completed','cancelled')").bind(targetId,user.skrDomain).first()) throw new ApiError(409,'testing_obligations_pending');
   if (table === "comments") {
     const comment = await env.DB.prepare("SELECT id FROM comments WHERE id=? AND author_skr=? AND deleted_at IS NULL")
       .bind(targetId, user.skrDomain).first<{ id: string }>();
@@ -400,7 +440,7 @@ async function me(request: Request, env: Env): Promise<Response> {
     env.DB.prepare("SELECT * FROM needs WHERE author_skr=? AND deleted_at IS NULL ORDER BY created_at DESC").bind(user.skrDomain).all(),
     env.DB.prepare("SELECT * FROM works WHERE author_skr=? AND deleted_at IS NULL ORDER BY created_at DESC").bind(user.skrDomain).all(),
   ]);
-  return json({ profile, needs: needs.results.map(serializeNeed), works: works.results.map(serializeWork) });
+  return json({ profile, needs: (await enrichNeeds(env, needs.results, user)).map(serializeNeed), works: works.results.map(serializeWork) });
 }
 
 async function publicProfile(skrDomain: string, request: Request, env: Env): Promise<Response> {
@@ -411,7 +451,7 @@ async function publicProfile(skrDomain: string, request: Request, env: Env): Pro
     env.DB.prepare("SELECT * FROM needs WHERE author_skr=? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT 50").bind(skrDomain.toLowerCase()).all(),
     env.DB.prepare("SELECT * FROM works WHERE author_skr=? AND deleted_at IS NULL AND moderation_status='published' ORDER BY created_at DESC LIMIT 50").bind(skrDomain.toLowerCase()).all(),
   ]);
-  return json({ profile: isPublicContentAllowed("profile", profile) ? profile : { ...profile, bio: null, social_url: null }, needs: needs.results.filter((row) => isPublicContentAllowed("need", row)).map(serializeNeed), works: works.results.filter((row) => isPublicContentAllowed("work", row)).map(serializeWork) });
+  return json({ profile: isPublicContentAllowed("profile", profile) ? profile : { ...profile, bio: null, social_url: null }, needs: (await enrichNeeds(env, needs.results.filter((row) => isPublicContentAllowed("need", row)), await optionalSession(request,env))).map(serializeNeed), works: works.results.filter((row) => isPublicContentAllowed("work", row)).map(serializeWork) });
 }
 
 async function updateProfile(request: Request, env: Env): Promise<Response> {
@@ -430,6 +470,10 @@ async function updateProfile(request: Request, env: Env): Promise<Response> {
 async function deleteAccount(request: Request, env: Env): Promise<Response> {
   const user = await requireSession(request, env);
   const timestamp = now();
+  const obligations = await env.DB.prepare(`SELECT 1 WHERE EXISTS(SELECT 1 FROM testing_campaigns WHERE creator_skr=? AND status NOT IN ('completed','cancelled'))
+    OR EXISTS(SELECT 1 FROM testing_entries WHERE tester_skr=? AND status NOT IN ('paid','withdrawn','expired') AND NOT(status='rejected' AND appeal_by<=?))`)
+    .bind(user.skrDomain,user.skrDomain,timestamp).first();
+  if(obligations) throw new ApiError(409,'testing_obligations_pending');
   await env.DB.batch([
     env.DB.prepare("UPDATE users SET status='deleted',bio=NULL,social_url=NULL,deleted_at=?,updated_at=? WHERE skr_domain=?").bind(timestamp, timestamp, user.skrDomain),
     env.DB.prepare("UPDATE needs SET deleted_at=? WHERE author_skr=? AND deleted_at IS NULL").bind(timestamp, user.skrDomain),
@@ -437,6 +481,8 @@ async function deleteAccount(request: Request, env: Env): Promise<Response> {
     env.DB.prepare("UPDATE comments SET deleted_at=? WHERE author_skr=? AND deleted_at IS NULL").bind(timestamp, user.skrDomain),
     env.DB.prepare("UPDATE messages SET deleted_at=? WHERE sender_skr=? AND deleted_at IS NULL").bind(timestamp, user.skrDomain),
     env.DB.prepare("DELETE FROM reactions WHERE identity_skr=?").bind(user.skrDomain),
+    env.DB.prepare('DELETE FROM need_followers WHERE identity_skr=?').bind(user.skrDomain),
+    env.DB.prepare('DELETE FROM app_followers WHERE identity_skr=?').bind(user.skrDomain),
     env.DB.prepare("DELETE FROM user_blocks WHERE blocker_skr=? OR blocked_skr=?").bind(user.skrDomain, user.skrDomain),
     env.DB.prepare("UPDATE sessions SET revoked_at=? WHERE skr_domain=? AND revoked_at IS NULL").bind(timestamp, user.skrDomain),
   ]);
@@ -621,7 +667,7 @@ async function adminRoute(path: string, request: Request, env: Env): Promise<Res
     return json({ priceSkr, durationDays: Number(env.RECOMMENDATION_DAYS), environment: env.ENVIRONMENT, paymentMode: env.PAYMENT_MODE });
   }
   if (request.method === "GET" && path === "/admin/needs") {
-    const result = await env.DB.prepare("SELECT * FROM needs WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 200").all();
+    const result = await env.DB.prepare("SELECT n.*,(SELECT display_name FROM store_catalog WHERE android_package=n.store_package) AS app_name FROM needs n WHERE deleted_at IS NULL ORDER BY created_at DESC LIMIT 200").all();
     return json({ items: result.results.map(serializeNeed) });
   }
   if (request.method === "GET" && path === "/admin/works") {
@@ -865,6 +911,10 @@ async function assertReportTargetExists(targetType: string, targetId: string, en
 
 function serializeNeed(row: Record<string, unknown>) {
   return {
+    campaign_id: row.campaign_id ?? null,
+    campaign_reward_units: row.campaign_reward_units ?? null,
+    campaign_funding_state: row.campaign_funding_state ?? null,
+    campaign_status: row.campaign_status ?? null,
     id: row.id,
     author_skr: row.author_skr,
     title: row.title,
@@ -877,6 +927,18 @@ function serializeNeed(row: Record<string, unknown>) {
     media: parseJsonArray(row.media_json),
     request_type: row.request_type ?? "free",
     budget_skr: row.budget_skr ?? null,
+    kind: row.kind ?? 'need',
+    feedback_type: row.feedback_type ?? null,
+    store_package: row.store_package ?? null,
+    app_name: row.app_name ?? null,
+    app_icon: row.app_icon ?? null,
+    status: row.status ?? 'open',
+    revision: row.revision ?? 1,
+    updated_at: row.updated_at ?? null,
+    follower_count: row.follower_count ?? 0,
+    tester_count: row.tester_count ?? 0,
+    following: Boolean(row.following),
+    wants_test: Boolean(row.wants_test),
     need_count: row.need_count,
     comment_count: row.comment_count,
     created_at: row.created_at,
@@ -891,6 +953,7 @@ function serializeWork(row: Record<string, unknown>) {
     summary: row.summary,
     description: row.description,
     store_url: row.store_url,
+    store_package: row.store_package ?? null,
     category: row.category,
     tags: parseJsonArray(row.tags_json),
     icon_key: row.icon_key,
@@ -933,6 +996,8 @@ async function runRetentionCleanup(env: Env): Promise<void> {
   ].filter(Boolean);
   await Promise.all(mediaKeys.map((key) => env.MEDIA.delete(key)));
   const results = await env.DB.batch([
+    env.DB.prepare('DELETE FROM need_revisions WHERE need_id IN (SELECT id FROM needs WHERE deleted_at IS NOT NULL AND deleted_at<?)').bind(thirtyDaysAgo),
+    env.DB.prepare('DELETE FROM need_followers WHERE need_id IN (SELECT id FROM needs WHERE deleted_at IS NOT NULL AND deleted_at<?)').bind(thirtyDaysAgo),
     env.DB.prepare(`DELETE FROM operations_projects WHERE
       (target_type='need' AND EXISTS(SELECT 1 FROM needs n WHERE n.id=target_id AND n.deleted_at IS NOT NULL AND n.deleted_at<?)) OR
       (target_type='work' AND EXISTS(SELECT 1 FROM works w WHERE w.id=target_id AND w.deleted_at IS NOT NULL AND w.deleted_at<?))`).bind(thirtyDaysAgo,thirtyDaysAgo),

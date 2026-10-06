@@ -4,12 +4,13 @@
   "scripts": {
     "test": "node --test tests/*.test.mjs",
     "api:typecheck": "tsc --noEmit -p apps/api/tsconfig.json",
-    "api:dev": "wrangler dev apps/api/src/index.ts",
+    "api:dev": "wrangler dev --config apps/api/wrangler.toml",
     "api:deploy": "wrangler deploy apps/api/src/index.ts --config apps/api/wrangler.toml",
     "admin:dev": "wrangler pages dev . --cwd apps/admin",
     "admin:deploy": "wrangler pages deploy . --cwd apps/admin --project-name liondapp-admin --branch main",
-    "site:dev": "wrangler pages dev apps/site",
-    "site:deploy": "wrangler pages deploy apps/site --project-name liondapp-site --branch main"
+    "site:dev": "wrangler pages dev --cwd apps/site",
+    "site:deploy": "wrangler pages deploy . --cwd apps/site --project-name liondapp-site --branch main",
+    "site:typecheck": "tsc --noEmit -p apps/site/tsconfig.json"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260906.1",

@@ -34,8 +34,8 @@ android {
         applicationId = "top.oneion.liondapp"
         minSdk = 26
     targetSdk = 36
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 4
+        versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -62,7 +62,7 @@ android {
         debug {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-devnet.debug"
-            buildConfigField("boolean", "PROMOTION_PURCHASE_ENABLED", "true")
+            buildConfigField("boolean", "PROMOTION_PURCHASE_ENABLED", "false")
         }
         create("qa") {
             initWith(getByName("debug"))
@@ -82,6 +82,7 @@ android {
 
     // Instrumentation has its own package/storage; never overwrite a user's test login.
     testBuildType = "qa"
+    sourceSets.getByName("androidTest").assets.srcDir(rootProject.file("tests/fixtures"))
 
     buildFeatures {
         compose = true

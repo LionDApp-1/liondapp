@@ -1,15 +1,20 @@
 # Public release package
 
-This repository contains the reviewed source for LionDApp, a native Kotlin/Jetpack Compose Solana Mobile community app. Production account identifiers, Cloudflare secrets, signing keys, private backups and operator-only runbooks are intentionally excluded.
+Updated 6 October 2026. LionDApp is a native Kotlin/Jetpack Compose Seeker community for discovery, feedback and structured testing. This public source snapshot matches the current implementation. Git history is preserved. The synchronization date is not a claim about when each feature was originally written.
 
-## Local development
+## Current artifacts
 
-- Install Node.js and run `npm ci`.
-- Run `npm test` for the JavaScript test suite.
-- Copy `apps/api/wrangler.example.toml` to a local-only Wrangler config and replace the D1/R2 placeholders with resources you control.
-- Configure credentialed RPC and moderation bindings as local secrets. Never commit `.dev.vars`, tokens, wallet secrets or signing credentials.
-- Build the Android client with the Gradle wrapper. Store release signing material outside the repository.
+- [Source](https://github.com/LionDApp-1/liondapp)
+- [English Demo](https://youtu.be/JaMHQUdflUQ), actual signed release footage, English narration and captions
+- [English deck](../submission/LionDApp_ClockIn_2026_Deck_EN.pptx), nine slides describing current functionality and roadmap
+- [Signed APK](../submission/LionDApp-release.apk), 1.2.1 / code 4
+- [Release metadata](../submission/release-1.2.1.json)
+- [Build and test verification](../submission/source-verification.json)
 
-## Submission assets
+The Store release is In Review. Store distribution and approval are pending. Free testing works. Creator-funded SKR deposits, settlement, 10% creator-paid fees and refunds are planned. Public payment gates are disabled. Compiled local escrow tests do not prove public network funding.
 
-The `submission/` directory contains the current English Clock In deck and the signed Seeker APK used for owner acceptance. Store publication and hackathon links remain subject to the owner's portal upload and review steps.
+## Reviewer setup
+
+Follow [README](../README.md) for prerequisites and builds. Copy the Wrangler example files to ignored local configs and use your own database/storage resources. Tests use SQLite and mocks without production credentials.
+
+Production configuration, signing keys, credentials, private backups and user/device evidence are excluded. Development dependencies and generated outputs stay local. The release APK uses the original external certificate. Debug builds need no signing secrets.

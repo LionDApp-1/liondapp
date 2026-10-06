@@ -19,9 +19,9 @@ test("Coil includes its explicit network image fetcher", () => {
 
 test("published work controls remain owner-only", () => {
   assert.match(mobile, /val isOwner = state\.skrDomain != null && target\.author == state\.skrDomain/);
-  assert.match(mobile, /target\.kind == "work" && isOwner\) IconButton\(\{ confirmDelete = true \}/);
+  assert.match(mobile, /if \(isOwner\) DropdownMenuItem[\s\S]*?confirmDelete = true/);
   assert.match(mobile, /target\.moderationStatus == "published" && !promotionActive/);
-  assert.match(mobile, /viewModel\.deleteWork\(target\.id\) \{ deleted -> if \(deleted\) onClose\(\) \}/);
+  assert.match(mobile, /viewModel\.deleteWork\(target\.id\) \{ if \(it\) \{ confirmDelete = false; onClose\(\) \} \}/);
 });
 
 test("Chinese Store copy uses cached translations with English fallback", () => {

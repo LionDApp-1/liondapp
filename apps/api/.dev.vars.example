@@ -1,0 +1,10 @@
+# Local-only placeholders. Copy to .dev.vars, replace locally, never commit secrets.
+ABUSE_HASH_KEY="replace-with-a-random-local-development-key"
+IDENTITY_RPC_URL_SECRET="https://your-private-mainnet-rpc.invalid"
+SOLANA_RPC_URL="https://api.devnet.solana.com"
+BOUNTY_MODE="disabled"
+DONATIONS_ENABLED="false"
+# Enable all three simulation flags only in an isolated development environment.
+# BOUNTY_MODE="simulation"
+# ENVIRONMENT="devnet"
+# PAYMENT_MODE="simulation"

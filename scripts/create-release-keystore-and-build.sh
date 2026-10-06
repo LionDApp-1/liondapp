@@ -13,6 +13,10 @@ if [[ "$signing_mode" != "create" && "$signing_mode" != "reuse" ]]; then
   echo "Signing mode must be create or reuse." >&2
   exit 1
 fi
+if [[ "$signing_mode" == "create" && -f "$repo_root/apps/mobile/release-identity.json" ]]; then
+  echo "This project has an original release identity. Restore/reuse its key; do not create a replacement." >&2
+  exit 1
+fi
 
 if [[ -z "$keystore_path" ]]; then
   echo "Usage: $0 /absolute/path/liondapp-release.jks" >&2
@@ -105,6 +109,7 @@ LIONDAPP_KEYTOOL_PASSWORD="$release_password" "$jdk_home/bin/keytool" -exportcer
   -keystore "$keystore_path" -storepass:env LIONDAPP_KEYTOOL_PASSWORD \
   -alias "$key_alias" -file "$certificate_file"
 expected_signer="$(shasum -a 256 "$certificate_file" | awk '{print $1}')"
+python3 "$repo_root/scripts/record-release-artifact.py" --check-certificate "$expected_signer"
 
 export LIONDAPP_RELEASE_STORE_FILE="$keystore_path"
 export LIONDAPP_RELEASE_STORE_PASSWORD="$release_password"

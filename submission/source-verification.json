@@ -1,0 +1,39 @@
+{
+  "date": "2026-10-06",
+  "nodeTests": {
+    "pass": 122,
+    "fail": 0
+  },
+  "pythonTests": {
+    "pass": 8,
+    "fail": 0
+  },
+  "apiTypecheck": "passed",
+  "siteTypecheck": "passed",
+  "workerDryRun": "passed, local template config",
+  "android": {
+    "assembleDebug": "passed",
+    "lintDebug": "passed",
+    "testDebugUnitTest": [
+      {
+        "name": "top.oneion.liondapp.wallet.TipAmountTest",
+        "tests": 2,
+        "failures": 0
+      },
+      {
+        "name": "top.oneion.liondapp.wallet.DonationValidationTest",
+        "tests": 4,
+        "failures": 0
+      }
+    ]
+  },
+  "sourceParity": "Current apps/packages/tests/programs source synchronized from private workspace. Production configuration excluded.",
+  "walletSwitching": "untested",
+  "mainnetSkrFunding": "disabled",
+  "secrets": "No keys, credentials, private runtime data or signing keystore included.",
+  "skillPreflight": {
+    "nativeExpoCheck": "Not applicable: native Kotlin/Compose, no Expo app.json",
+    "apkPathCheck": "APK verified under submission, not artifacts",
+    "networkLiterals": "Devnet references retained in test/QA paths. Production authentication uses Mainnet identity. Public SKR payments disabled."
+  }
+}

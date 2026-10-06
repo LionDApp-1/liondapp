@@ -18,3 +18,13 @@ local.properties
 artifacts/*
 .codex-build/
 **/__pycache__/
+programs/**/target/
+
+# Safe, deliberately non-secret local setup template.
+!apps/api/.dev.vars.example
+
+# Local deployment configuration
+apps/api/wrangler.toml
+apps/admin/wrangler.toml
+apps/site/wrangler.toml
+media/

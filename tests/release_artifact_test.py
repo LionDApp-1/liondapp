@@ -12,6 +12,35 @@ spec.loader.exec_module(module)
 
 
 class ReleaseArtifactTest(unittest.TestCase):
+    def test_pins_existing_release_certificate_before_any_build_or_archive(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            baseline = root / 'apps/mobile/release-identity.json'
+            baseline.parent.mkdir(parents=True)
+            baseline.write_text(json.dumps(dict(package='top.oneion.liondapp', signerSha256='a' * 64)))
+            module.check_certificate(root, 'a' * 64)
+            with self.assertRaisesRegex(ValueError, 'original release identity'):
+                module.check_certificate(root, 'b' * 64)
+            with patch.object(module, '__file__', str(root / 'scripts/record.py')), patch.object(module.subprocess, 'check_output', side_effect=AssertionError('Must reject before reading APK')):
+                with self.assertRaises(ValueError):
+                    module.record(root / 'app.apk', root / 'apksigner', 'b' * 64)
+            self.assertFalse((root / 'artifacts').exists())
+
+    def test_missing_or_malformed_baseline_fails_closed_for_updates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            release = root / 'artifacts/release-old/release-evidence.json'
+            release.parent.mkdir(parents=True)
+            release.write_text('{}')
+            with self.assertRaisesRegex(ValueError, 'requires its public certificate baseline'):
+                module.check_certificate(root, 'a' * 64)
+            baseline = root / 'apps/mobile/release-identity.json'
+            baseline.parent.mkdir(parents=True)
+            for data in [dict(package='wrong', signerSha256='a' * 64), dict(package='top.oneion.liondapp', signerSha256='bad')]:
+                baseline.write_text(json.dumps(data))
+                with self.assertRaisesRegex(ValueError, 'malformed'):
+                    module.check_certificate(root, 'a' * 64)
+
     def test_finds_latest_complete_stable_tools_without_external_commands(self):
         with tempfile.TemporaryDirectory() as tmp:
             sdk = Path(tmp)

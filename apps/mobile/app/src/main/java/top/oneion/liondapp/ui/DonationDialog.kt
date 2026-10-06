@@ -54,17 +54,20 @@ internal fun DonationContent(
                 TextButton(close, enabled = !state.donationBusy) { Text(uiText("Back", "返回")) }
                 Text(uiText("Support LionDApp", "支持 LionDApp"), style = MaterialTheme.typography.headlineSmall)
                 Text(uiText("If LionDApp has helped you, you can leave an optional SKR tip for the project. It does not purchase services, ranking, or any other benefit.", "如果 LionDApp 对你有帮助，可以自愿向项目打赏 SKR。打赏不购买服务、排名或其他权益。"))
+                FormSectionHeading(uiText("Payment destination", "支付目标"))
                 Text(uiText("Solana Mainnet · SKR", "Solana 主网 · SKR"), color = MaterialTheme.colorScheme.primary)
                 SelectionContainer { Text(uiText("Project wallet\n", "项目收款钱包\n") + TIP_RECEIVER) }
                 SelectionContainer { Text("SKR Mint\n$TIP_MINT", style = MaterialTheme.typography.bodySmall) }
                 if (state.donationStatus == null) {
                     val enabled = state.donationConfig.allowsTips(tipsAllowedInBuild)
+                    FormSectionHeading(uiText("Amount & review", "金额与确认"))
                     if (!enabled) Text(uiText("Tipping is currently unavailable. All community features remain free to use.", "打赏当前暂不可用，社区功能仍可免费使用。"))
                     OutlinedTextField(amount, { amount = it }, Modifier.fillMaxWidth(), label = { Text(uiText("Tip amount · SKR", "打赏金额 · SKR")) }, enabled = enabled && !state.donationBusy && state.donationQuote == null, isError = invalidAmount, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), singleLine = true, supportingText = {
                         Text(if (invalidAmount) uiText("Enter a whole number from 1 to 1,000,000, without punctuation or a minus sign.", "请输入 1–1,000,000 的整数，不含小数点、负号或分隔符。") else uiText("1–1,000,000 whole SKR. SOL is also needed for network costs.", "1–1,000,000 整数 SKR，同时需要 SOL 支付网络费用。"))
                     })
                     if (state.donationQuote == null) Button({ parsedAmount?.let(prepare) }, enabled = enabled && parsedAmount != null && !state.donationBusy) { Text(uiText("Review tip", "查看打赏详情")) }
                     state.donationQuote?.let { quote ->
+                        FormSectionHeading(uiText("Transaction review", "交易核对"))
                         Text(uiText("You send ${quote.amountSkr} SKR", "你将支付 ${quote.amountSkr} SKR"), style = MaterialTheme.typography.titleLarge)
                         SelectionContainer { Text(uiText("From: ", "付款钱包：") + quote.payerAddress, style = MaterialTheme.typography.bodySmall) }
                         val network = runCatching { BigDecimal(quote.networkFeeLamports).movePointLeft(9).toPlainString() }.getOrDefault("—")

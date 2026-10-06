@@ -15,6 +15,22 @@ data class NeedItem(
     val format: String = "structured",
     @SerialName("request_type") val requestType: String = "free",
     @SerialName("budget_skr") val budgetSkr: Int? = null,
+    val kind: String = "need",
+    @SerialName("feedback_type") val feedbackType: String? = null,
+    @SerialName("store_package") val storePackage: String? = null,
+    @SerialName("app_name") val appName: String? = null,
+    @SerialName("app_icon") val appIcon: String? = null,
+    @SerialName("campaign_id") val campaignId: String? = null,
+    @SerialName("campaign_reward_units") val campaignRewardUnits: String? = null,
+    @SerialName("campaign_funding_state") val campaignFundingState: String? = null,
+    @SerialName("campaign_status") val campaignStatus: String? = null,
+    val status: String = "open",
+    val revision: Int = 1,
+    @SerialName("updated_at") val updatedAt: String? = null,
+    @SerialName("follower_count") val followerCount: Int = 0,
+    @SerialName("tester_count") val testerCount: Int = 0,
+    val following: Boolean = false,
+    @SerialName("wants_test") val wantsTest: Boolean = false,
     val tags: List<String> = emptyList(),
     val media: List<String> = emptyList(),
     @SerialName("need_count") val needCount: Int = 0,
@@ -30,6 +46,7 @@ data class WorkItem(
     val summary: String,
     val description: String,
     @SerialName("store_url") val storeUrl: String,
+    @SerialName("store_package") val storePackage: String? = null,
     val category: String,
     val tags: List<String> = emptyList(),
     @SerialName("icon_key") val iconKey: String,
@@ -66,6 +83,7 @@ data class StoreAppItem(
 @Serializable data class WorkListResponse(val promoted: List<WorkItem> = emptyList(), val items: List<WorkItem> = emptyList())
 @Serializable data class SearchResponse(val needs: List<NeedItem> = emptyList(), val works: List<WorkItem> = emptyList(), val storeApps: List<StoreAppItem> = emptyList())
 @Serializable data class StoreAppListResponse(val items: List<StoreAppItem> = emptyList())
+@Serializable data class DiscoveryResponse(val testing: List<NeedItem> = emptyList(), val resolved: List<NeedItem> = emptyList(), val feedback: List<NeedItem> = emptyList(), val popular: List<NeedItem> = emptyList())
 
 @Serializable
 data class PublicConfig(
@@ -117,6 +135,10 @@ data class CreateNeedRequest(
     val format: String = "structured",
     val requestType: String = "free",
     val budgetSkr: Int? = null,
+    val kind: String = "need",
+    val feedbackType: String? = null,
+    val storePackage: String? = null,
+    val revision: Int? = null,
 )
 
 @Serializable
@@ -129,6 +151,7 @@ data class CreateWorkRequest(
     val iconKey: String,
     val screenshotKeys: List<String>,
     val demoUrl: String? = null,
+    val storePackage: String? = null,
 )
 
 @Serializable data class CreatedResponse(val id: String, val createdAt: String? = null, val status: String? = null)
@@ -143,12 +166,21 @@ data class CommentItem(
     @SerialName("target_id") val targetId: String,
     @SerialName("parent_id") val parentId: String? = null,
     val body: String,
+    @SerialName("response_kind") val responseKind: String = "discussion",
+    @SerialName("linked_store_package") val linkedStorePackage: String? = null,
+    @SerialName("linked_app_name") val linkedAppName: String? = null,
+    @SerialName("linked_work_id") val linkedWorkId: String? = null,
+    @SerialName("linked_work_name") val linkedWorkName: String? = null,
+    @SerialName("outcome_status") val outcomeStatus: String? = null,
     @SerialName("like_count") val likeCount: Int = 0,
     @SerialName("created_at") val createdAt: String,
 )
 
 @Serializable data class CommentListResponse(val items: List<CommentItem> = emptyList())
-@Serializable data class CreateCommentRequest(val body: String, val parentId: String? = null)
+@Serializable data class CreateCommentRequest(val body: String, val parentId: String? = null, val responseKind: String = "discussion", val linkedStorePackage: String? = null, val linkedWorkId: String? = null)
+@Serializable data class FollowRequest(val wantsTest: Boolean)
+@Serializable data class AppFollowState(val following: Boolean = false)
+@Serializable data class ProgressRequest(val status: String, val body: String, val revision: Int, val linkedStorePackage: String? = null, val linkedWorkId: String? = null)
 @Serializable data class MediaUploadResponse(val key: String, val url: String)
 
 @Serializable
@@ -166,7 +198,8 @@ data class PromotionOrderResponse(
 
 @Serializable data class PublicProfile(@SerialName("skr_domain") val skrDomain: String, val bio: String? = null, @SerialName("social_url") val socialUrl: String? = null, val locale: String = "en", @SerialName("created_at") val createdAt: String)
 @Serializable data class MeResponse(val profile: PublicProfile, val needs: List<NeedItem> = emptyList(), val works: List<WorkItem> = emptyList())
-@Serializable data class NotificationItem(val id: String, val type: String, @SerialName("created_at") val createdAt: String, @SerialName("read_at") val readAt: String? = null)
+@Serializable data class NotificationPayload(val targetType: String? = null, val targetId: String? = null, val workId: String? = null, val title: String? = null, val actor: String? = null, val status: String? = null, val decision: String? = null)
+@Serializable data class NotificationItem(val id: String, val type: String, @SerialName("created_at") val createdAt: String, @SerialName("read_at") val readAt: String? = null, val payload: NotificationPayload = NotificationPayload())
 @Serializable data class NotificationListResponse(val items: List<NotificationItem> = emptyList())
 @Serializable data class BlockedUser(val skrDomain: String, val createdAt: String)
 @Serializable data class BlockListResponse(val items: List<BlockedUser> = emptyList())
