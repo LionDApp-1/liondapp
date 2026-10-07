@@ -11,7 +11,8 @@ Current signed APK: **1.2.1 / versionCode 4**, package `top.oneion.liondapp`. Su
 - [Website](https://liondapp.1ion.top/)
 - [Download signed APK](https://raw.githubusercontent.com/LionDApp-1/liondapp/main/submission/LionDApp-release.apk)
 - [142-second English Demo](https://youtu.be/JaMHQUdflUQ)
-- [English Clock In deck](https://raw.githubusercontent.com/LionDApp-1/liondapp/main/submission/LionDApp_ClockIn_2026_Deck_EN.pptx)
+- [English Clock In deck — PDF on Google Drive](https://drive.google.com/file/d/1vEWopU-mHC__0-Ke_nfcpXYhCleA83RF/view)
+- [PDF mirror](submission/LionDApp_ClockIn_2026_Deck_EN.pdf) · [Editable PPTX](submission/LionDApp_ClockIn_2026_Deck_EN.pptx)
 - [Current status and verification](docs/project-status.md)
 - [Public release metadata](submission/release-1.2.1.json)
 

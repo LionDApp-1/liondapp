@@ -1,12 +1,13 @@
 # Public release package
 
-Updated 6 October 2026. LionDApp is a native Kotlin/Jetpack Compose Seeker community for discovery, feedback and structured testing. This public source snapshot matches the current implementation. Git history is preserved. The synchronization date is not a claim about when each feature was originally written.
+Updated 7 October 2026. LionDApp is a native Kotlin/Jetpack Compose Seeker community for discovery, feedback and structured testing. This public source snapshot matches the current implementation. Git history is preserved. The synchronization date is not a claim about when each feature was originally written.
 
 ## Current artifacts
 
 - [Source](https://github.com/LionDApp-1/liondapp)
 - [English Demo](https://youtu.be/JaMHQUdflUQ), actual signed release footage, English narration and captions
-- [English deck](../submission/LionDApp_ClockIn_2026_Deck_EN.pptx), nine slides describing current functionality and roadmap
+- [English deck on Google Drive](https://drive.google.com/file/d/1vEWopU-mHC__0-Ke_nfcpXYhCleA83RF/view), nine reviewed slides, PDF with public viewing and download
+- [PDF mirror](../submission/LionDApp_ClockIn_2026_Deck_EN.pdf) · [Editable PPTX](../submission/LionDApp_ClockIn_2026_Deck_EN.pptx)
 - [Signed APK](../submission/LionDApp-release.apk), 1.2.1 / code 4
 - [Release metadata](../submission/release-1.2.1.json)
 - [Build and test verification](../submission/source-verification.json)
