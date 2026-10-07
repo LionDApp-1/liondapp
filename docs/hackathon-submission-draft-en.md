@@ -20,4 +20,4 @@ Updated 7 October 2026. Adjust to the actual event form and accepted artifact. N
 
 **Deck for the event:** https://drive.google.com/file/d/1vEWopU-mHC__0-Ke_nfcpXYhCleA83RF/view. Nine-page PDF converted from the reviewed presentation, preserving the original layout. The PPTX remains available as an editable source.
 
-**Submission status:** Draft preparation, not submitted. GitHub connection and verified server-side saving are pending.
+**Submission status:** Submitted to Clock In on 7 October 2026. The event portal reports SUBMITTED · LOCKED, verified after browser reload. The owner personally accepted the final declaration and submitted. The public video captions were read successfully.

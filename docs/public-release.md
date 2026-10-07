@@ -19,3 +19,7 @@ The Store release is In Review. Store distribution and approval are pending. Fre
 Follow [README](../README.md) for prerequisites and builds. Copy the Wrangler example files to ignored local configs and use your own database/storage resources. Tests use SQLite and mocks without production credentials.
 
 Production configuration, signing keys, credentials, private backups and user/device evidence are excluded. Development dependencies and generated outputs stay local. The release APK uses the original external certificate. Debug builds need no signing secrets.
+
+## Clock In submission
+
+Submitted on 7 October 2026. The portal reports SUBMITTED · LOCKED, verified after a browser reload. It includes the English Google Drive PDF, public narrated demo with published captions, source repository and signed APK. Store review remains a separate process; In Review is not Store approval.

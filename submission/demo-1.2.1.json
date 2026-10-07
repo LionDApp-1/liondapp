@@ -1,5 +1,5 @@
 {
-  "videoUrl": "https://youtu.be/JaMHQUdflUQ",
+  "videoUrl": "https://www.youtube.com/watch?v=JaMHQUdflUQ",
   "visibility": "public",
   "publishedDate": "2026-10-06",
   "language": "English",
@@ -7,11 +7,13 @@
   "subtitleFile": "LionDApp_Demo_EN.srt",
   "deckFile": "LionDApp_ClockIn_2026_Deck_EN.pptx",
   "deckSha256": "2abf1f1cffa5ae495092049356b6435f22fbabb1c61f70ef464896369e76fa0e",
-  "hackathonStatus": "draft preparation; GitHub connection pending identity verification; not submitted",
+  "hackathonStatus": "submitted and locked; verified after browser reload",
   "anonymousPlayback": "Verified in Chrome Incognito without login, player duration 2:22 and English captions visible",
   "deckUrl": "https://drive.google.com/file/d/1vEWopU-mHC__0-Ke_nfcpXYhCleA83RF/view",
   "deckPdfFile": "LionDApp_ClockIn_2026_Deck_EN.pdf",
   "deckPdfSha256": "6213c31685c77cdad84fc69591538e63c54177e807b902620d4cb4ce652bffc3",
   "deckPdfPages": 9,
-  "deckPdfBytes": 711969
+  "deckPdfBytes": 711969,
+  "hackathonSubmittedDate": "2026-10-07",
+  "eventTranscript": "Published captions read successfully, 2028 characters"
 }

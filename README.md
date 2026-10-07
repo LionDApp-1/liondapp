@@ -18,6 +18,8 @@ Current signed APK: **1.2.1 / versionCode 4**, package `top.oneion.liondapp`. Su
 
 APK SHA-256: `f5781a084fbc55d6b28682afd6500048664ee5ec58ed71a0561e93e790892cf3`.
 
+Clock In hackathon entry submitted on **7 October 2026**, confirmed as **SUBMITTED · LOCKED**.
+
 ## What works and what is planned
 
 | Capability | State |
