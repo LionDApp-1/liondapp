@@ -116,6 +116,8 @@ pub mod liondapp_testing_escrow {
         let campaign = &ctx.accounts.campaign;
         let bump = [campaign.bump];
         let seeds: &[&[u8]] = &[b"campaign", campaign.creator.as_ref(), &campaign.nonce, &bump];
+        // Program<Token> pins the CPI to SPL Token. It can change token balances,
+        // not this escrow-owned Campaign, so Campaign does not need a CPI reload.
         for (destination, amount) in [(ctx.accounts.reward_account.to_account_info(), campaign.reward), (ctx.accounts.fee_account.to_account_info(), campaign.fee)] {
             token::transfer_checked(CpiContext::new_with_signer(ctx.accounts.token_program.to_account_info(), TransferChecked { from: ctx.accounts.vault.to_account_info(), mint: ctx.accounts.mint.to_account_info(), to: destination, authority: campaign.to_account_info() }, &[seeds]), amount, 6)?;
         }
@@ -234,7 +236,9 @@ pub struct Refund<'info> {
     #[account(mut,has_one=config,has_one=creator,seeds=[b"campaign",creator.key().as_ref(),&campaign.nonce],bump=campaign.bump)] pub campaign: Account<'info, Campaign>,
     #[account(address=config.mint)] pub mint: Account<'info, Mint>,
     #[account(mut,seeds=[b"vault",campaign.key().as_ref()],bump,token::mint=mint,token::authority=campaign)] pub vault: Account<'info, TokenAccount>,
-    #[account(mut,token::mint=mint,token::authority=creator)] pub destination: Account<'info, TokenAccount>,
+    // The different token authorities already prevent aliasing. Keep that
+    // invariant explicit if account constraints are changed in a later version.
+    #[account(mut,token::mint=mint,token::authority=creator,constraint=destination.key()!=vault.key() @ EscrowError::InvalidTerms)] pub destination: Account<'info, TokenAccount>,
     pub token_program: Program<'info, Token>,
 }
 

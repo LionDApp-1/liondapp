@@ -16,14 +16,19 @@
     "@cloudflare/workers-types": "^5.20260906.1",
     "esbuild": "^0.28.1",
     "typescript": "^5.9.2",
-    "wrangler": "^4.35.0"
+    "wrangler": "^4.148.0",
+    "parse5": "^8.0.0"
   },
   "dependencies": {
     "@noble/curves": "^2.0.0",
     "@onsol/tldparser": "^0.6.7",
     "@scure/base": "^2.0.0",
-    "@solana/web3.js": "^1.98.4",
+    "@solana/web3.js": "^1.99.0",
     "jose": "^6.1.0",
     "buffer": "6.0.1"
+  },
+  "overrides": {
+    "jayson": "5.0.0",
+    "miniflare": { "sharp": "0.35.5" }
   }
 }

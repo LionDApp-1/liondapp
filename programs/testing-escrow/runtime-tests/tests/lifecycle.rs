@@ -460,6 +460,57 @@ fn deposit_settlement_and_unused_refund_conserve_tokens() {
 }
 
 #[test]
+fn audit_refund_alias_is_rejected_without_changing_balances_or_state() {
+    let mut f = Fixture::new(1);
+    let close = f.close_ix();
+    send(&mut f.svm, &f.creator, &[close], &[]).unwrap();
+    let before = f.balance(f.vault);
+    let mut refund = f.refund_ix();
+    refund.accounts[5].pubkey = f.vault;
+    assert!(send(&mut f.svm, &f.creator, &[refund], &[]).is_err());
+    assert_eq!(f.balance(f.vault), before);
+    assert!(!f.campaign().refunded);
+    let refund = f.refund_ix();
+    send(&mut f.svm, &f.creator, &[refund], &[]).unwrap();
+    assert_eq!(f.balance(f.vault), 0);
+    assert_eq!(f.balance(f.source), INITIAL);
+}
+
+#[test]
+fn audit_program_data_must_belong_to_the_upgradeable_loader() {
+    let mut f = Fixture::uninitialized(6);
+    let mut forged = f.svm.get_account(&f.program_data).unwrap();
+    forged.owner = system_program::ID;
+    f.svm.set_account(f.program_data, forged).unwrap();
+    let initialize = f.initialize(f.authority.pubkey());
+    assert!(send(&mut f.svm, &f.authority, &[initialize], &[]).is_err());
+    assert!(f.svm.get_account(&f.config).is_none());
+}
+
+#[test]
+fn audit_cpi_target_cannot_be_replaced_by_an_arbitrary_program() {
+    let mut f = Fixture::new(1);
+    f.reserve();
+    f.submit();
+    f.review(ReviewDecision::Approve);
+    let before = f.balance(f.vault);
+    let mut settle = f.settle_ix();
+    settle.accounts[10].pubkey = system_program::ID;
+    assert!(send(&mut f.svm, &f.creator, &[settle], &[]).is_err());
+    assert_eq!(f.balance(f.vault), before);
+    assert!(matches!(f.entry().state, EntryState::Approved));
+    assert_eq!(f.campaign().unsettled, 1);
+    let settle = f.settle_ix();
+    send(&mut f.svm, &f.creator, &[settle], &[]).unwrap();
+    let close = f.close_ix();
+    send(&mut f.svm, &f.creator, &[close], &[]).unwrap();
+    let mut refund = f.refund_ix();
+    refund.accounts[6].pubkey = system_program::ID;
+    assert!(send(&mut f.svm, &f.creator, &[refund], &[]).is_err());
+    assert!(!f.campaign().refunded);
+}
+
+#[test]
 fn failed_deposit_rolls_back_accounts_and_source_balance() {
     let mut f = Fixture::uninitialized(6);
     let i = f.initialize(f.authority.pubkey());

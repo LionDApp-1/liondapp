@@ -68,7 +68,7 @@ function donationSetup(options={}) {
   globalThis.fetch=async (url,init)=> {
     assert.equal(url,'https://rpc.test'); const {method,params}=JSON.parse(init.body);calls.push(method);let result;
     switch(method) {
-      case 'getGenesisHash': result=options.network ?? '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp';break;
+      case 'getGenesisHash': result=options.network ?? '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d';break;
       case 'getAccountInfo': {
         const data=Buffer.alloc(82);data[44]=6;data[45]=1;
         result={value:params[0]===MINT?{owner:options.mintOwner ?? TOKEN,data:[data.toString('base64'),'base64']}:null};break;
@@ -126,6 +126,18 @@ test('operator preflight is read-only, works while tips are closed, and requires
  for (const options of [{network:'devnet'},{mintOwner:RECEIVER}]) {
   const x=donationSetup(options);try {await assert.rejects(donationReadiness(x.env));}finally{x.close();}
  }
+});
+
+test('Mainnet genesis validation uses the full RPC hash, not a shortened wallet chain reference', async () => {
+ const full=donationSetup({network:'5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d'});
+ try { assert.equal((await donationReadiness(full.env)).rpcReady,true); }
+ finally { full.close(); }
+ const short=donationSetup({network:'5eykt4UsFv8P8NJdTREpY1vzqKqZKvdp'});
+ try {
+  await assert.rejects(donationReadiness(short.env), error => error.code==='donation_wrong_network');
+  assert.equal((await short.request('/v1/donations/quote',{amountSkr:1})).status,503);
+  assert.equal(short.sqlite.prepare('SELECT COUNT(*) n FROM donation_quotes').get().n,0);
+ } finally { short.close(); }
 });
 
 test('prepared tips are unsigned exact-unit transfers with only the allowed recipient, mint, memo and ATA creation',async()=>{

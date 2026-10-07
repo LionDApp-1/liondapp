@@ -20,6 +20,10 @@ APK SHA-256: `f5781a084fbc55d6b28682afd6500048664ee5ec58ed71a0561e93e790892cf3`.
 
 Clock In hackathon entry submitted on **7 October 2026**, confirmed as **SUBMITTED · LOCKED**.
 
+## Security review — 7 October 2026
+
+[Review and fixes](docs/security-review-2026-10-07.md) · [逐项中文结论](docs/security-review-2026-10-07-zh.md). Current validation passes 132 Node tests, 8 Python tests and 16 isolated SBF cases; npm audit reports zero findings. Rust maintenance/version notices remain documented. The 1.2.1 APK is unchanged; real SKR payments remain disabled. The external advisory covers the older c3151af commit, not these fixes.
+
 ## What works and what is planned
 
 | Capability | State |
@@ -29,7 +33,7 @@ Clock In hackathon entry submitted on **7 October 2026**, confirmed as **SUBMITT
 | Free testing campaigns, atomic capacity reservation, dedicated reports, one correction, review, appeals and platform resolution | Implemented |
 | Private reward drafts | Implemented, editable before funding |
 | Creator-funded SKR reward deposit, payout, fee and refund | Planned, live funds disabled |
-| Anchor testing escrow source | SBF artifact and 13 isolated account/CPI tests pass, not deployed |
+| Anchor testing escrow source | SBF artifact and 16 isolated account/CPI tests pass, not deployed |
 | X engagement tasks and push notifications | Deferred |
 
 The planned model is **net tester reward plus an additional 10% creator-paid platform fee**, deposited in full before recruitment. Fees use exact integer SKR units. A public comment is not a testing report. A suggested development budget is not funded escrow. `.skr` ownership verification is distinct from SKR token payments and does not certify that an author officially represents an app.

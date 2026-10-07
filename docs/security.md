@@ -73,14 +73,16 @@ not an availability fallback.
 - Push delivery is deferred; do not advertise it while credentials and token handling are absent.
 - Complete security review and physical Seeker tests.
 
-## Accepted dependency risk
+## Dependency review (7 October 2026)
 
-As of 6 September 2026, `npm audit` reports six moderate availability findings
-through `@onsol/tldparser -> @solana/web3.js -> jayson -> stream-json/uuid`.
-No upstream fix is available. The affected parser is used only behind bounded
-authentication requests and does not receive arbitrary application JSON directly.
-Recheck before every release and replace or upgrade the dependency when a
-compatible fix exists; do not use a forced incompatible upgrade.
+The [security report response](security-review-2026-10-07.md) records the reviewed
+snapshot, fixes, false positives and residual Rust toolchain work. Current npm
+audit reports zero findings after upgrading Wrangler/web3 and applying reviewed
+Jayson/sharp overrides. RPC compatibility and rendering regressions pass.
+Rust maintenance/version advisories remain explicitly tracked; they are not
+covered by npm's result. Reassess dependency reachability and compatibility on
+every SDK or feature change. This maintainer review is not a third-party safety
+certification and does not authorize enabling real funds.
 
 # Official catalog boundary
 
@@ -94,6 +96,6 @@ clear existing data. App feedback and campaigns link to catalog apps but remain 
 
 Capacity and wallet/identity uniqueness are enforced in the same SQL admission statement. Unsettled results and appeal holds cannot be refunded. Optimistic transitions create audit/notification only for a successful mutation; stale decisions return 409. Free completion contains no fabricated transaction signature. Public unfunded drafts are hidden, including cancelled drafts. Existing enrolled testers retain access when the host or linked post is hidden. Account deletion is restricted while obligations remain.
 
-The public deployment uses `BOUNTY_MODE=disabled`. Simulation requires Devnet plus both simulation flags. Positive-reward creation does not transfer tokens or publish a funded campaign. The Anchor source has a compiled SBF artifact and 13 passing isolated LiteSVM account/CPI tests, including partial-payment rollback and forged-account rejection; see [evidence](escrow-validation-2026-10-06.md). It remains undeployed and is not a live custody service. Real SKR transaction construction, confirmed-chain reconciliation and MWA recovery are still required. An operator must not turn on a flag to bypass these missing steps.
+The public deployment uses `BOUNTY_MODE=disabled`. Simulation requires Devnet plus both simulation flags. Positive-reward creation does not transfer tokens or publish a funded campaign. The Anchor source has a compiled SBF artifact and 16 passing isolated LiteSVM account/CPI tests after this review, including partial-payment rollback, refund alias, ProgramData owner and CPI-target rejection; see [review](security-review-2026-10-07.md) and [original evidence](escrow-validation-2026-10-06.md). It remains undeployed and is not a live custody service. Real SKR transaction construction, confirmed-chain reconciliation and MWA recovery are still required. An operator must not turn on a flag to bypass these missing steps.
 
 The public site only proxies anonymous GET status/catalog requests, discards client credentials, uses fixed internal targets and caps results at 12. Store text is inserted with `textContent`, not `innerHTML`. No wallet authentication or write capability exists on the website. Admin uses a separate Pages deployment, authenticated service binding and CSRF checks.

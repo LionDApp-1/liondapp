@@ -32,6 +32,13 @@ As of 6 October, **13 runtime cases pass** against the compiled `.so`, including
 
 This is local runtime evidence, not public-network, real SKR or mobile-wallet acceptance. The packaged Agave syscall allowlist is empty and produces a post-processing warning; the named syscalls execute successfully in the recorded LiteSVM tests. Keep that compiler warning in evidence rather than treating the build as warning-free.
 
+On 7 October, the [security review](../../docs/security-review-2026-10-07.md) added
+three attack regressions and an explicit refund account inequality. **16 runtime
+cases pass** against the rebuilt SBF. The new cases also pass against the original
+SBF, demonstrating the original authority/owner/CPI constraints already reject
+the reported attacks. This does not clear remaining host-toolchain advisories or
+prove public-network readiness.
+
 ## Required before paid launch
 
 1. Establish the network, actual program ID, dedicated deployment/upgrade authority and backed-up key management outside the repository.
